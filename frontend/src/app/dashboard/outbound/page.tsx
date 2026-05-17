@@ -1,286 +1,305 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import {
+  Plus,
+  Search,
+  Check,
+  X,
+  ClipboardX,
+  User,
+  Calendar,
+  FileText,
+  Building2,
+} from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
-
-interface OutboundFormValues {
-  productSku: string;
-  qtyToSub: string;
-  customerName: string;
-  note?: string;
-}
+import { useAdminStore } from "@/store/useAdminStore";
 
 export default function OutboundPage() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // 1. KẾT NỐI VÀ LẤY DỮ LIỆU TỪ ZUSTAND STORE TẬP TRUNG
   const {
-    products: availableProducts,
+    products,
     outboundTickets,
     isLoading,
     initializeData,
     addOutboundTicket,
   } = useWarehouseStore();
+  const { adminName } = useAdminStore(); // Lấy adminName từ store
 
-  // 2. TỰ ĐỘNG KHỞI TẠO DỮ LIỆU KHI VÀO TRANG
   useEffect(() => {
     initializeData();
   }, [initializeData]);
 
-  // 3. ĐỊNH NGHĨA VALIDATION SCHEMA VỚI LOGIC CHẶN XUẤT ÂM KHO
-  const outboundSchema = z
-    .object({
-      productSku: z
-        .string()
-        .min(1, { message: "Vui lòng chọn sản phẩm cần xuất kho" }),
-      qtyToSub: z
-        .string()
-        .min(1, { message: "Số lượng xuất không được để trống" })
-        .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-          message: "Số lượng xuất phải là số dương lớn hơn 0",
-        }),
-      customerName: z
-        .string()
-        .min(3, { message: "Tên đối tác/Đại lý nhận phải từ 3 ký tự" }),
-      note: z.string().optional(),
-    })
-    .superRefine((data, ctx) => {
-      const targetProduct = availableProducts.find(
-        (p) => p.sku === data.productSku
-      );
-      if (targetProduct && Number(data.qtyToSub) > targetProduct.qty) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["qtyToSub"],
-          message: `Vượt quá giới hạn! Trong kho hiện tại chỉ còn lại tối đa ${targetProduct.qty} cái.`,
-        });
-      }
-    });
-
-  // KHỞI TẠO HOOK FORM
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-  } = useForm<OutboundFormValues>({
-    resolver: zodResolver(outboundSchema),
-    defaultValues: { productSku: "", qtyToSub: "", customerName: "", note: "" },
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    productSku: "",
+    qty: 1,
+    customerName: "",
   });
 
-  // THEO DÕI SẢN PHẨM ĐANG ĐƯỢC CHỌN ĐỂ HIỂN THỊ THÔNG TIN TRỰC QUAN
-  const watchedSku = watch("productSku");
-  const selectedProductInfo = availableProducts.find(
-    (p) => p.sku === watchedSku
-  );
-
-  // XỬ LÝ LẬP PHIẾU XUẤT KHO (Giả lập độ trễ mạng 1 giây)
-  const onSubmit = (data: OutboundFormValues) => {
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      // Gọi Action của Zustand để tự động trừ bớt số lượng tồn trong kho dữ liệu chung
-      addOutboundTicket({
-        productSku: data.productSku,
-        qty: Number(data.qtyToSub),
-        customerName: data.customerName,
-      });
-
-      setIsSubmitting(false);
-      setIsOpen(false);
-      reset();
-    }, 1000);
+  const handleOpenModal = () => {
+    if (products.length > 0) {
+      setFormData({ productSku: products[0].sku, qty: 1, customerName: "" });
+    } else {
+      setFormData({ productSku: "", qty: 1, customerName: "" });
+    }
+    setIsModalOpen(true);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* HEADER & NÚT TẠO PHIẾU */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý xuất kho
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Lập phiếu xuất hàng, kiểm tra giới hạn tồn và lưu nhật ký đơn xuất.
+  // Hàm xử lý khi bấm xác nhận xuất kho
+  const handleSubmitTicket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.productSku) {
+      alert("Vui lòng chọn một sản phẩm để xuất kho!");
+      return;
+    }
+
+    const selectedProduct = products.find((p) => p.sku === formData.productSku);
+    if (selectedProduct && formData.qty > selectedProduct.qty) {
+      alert(
+        `Lỗi: Số lượng xuất (${formData.qty}) vượt quá số lượng tồn kho hiện tại (${selectedProduct.qty})!`
+      );
+      return;
+    }
+
+    // Ép kiểu nhẹ nhàng ở UI để truyền handler đi qua Store mượt mà không lo báo lỗi TypeScript
+    (addOutboundTicket as any)({
+      productSku: formData.productSku,
+      qty: formData.qty,
+      customerName: formData.customerName,
+      handler: adminName,
+    });
+
+    alert("Lập phiếu xuất kho thành công!");
+    setIsModalOpen(false);
+  };
+
+  const filteredTickets = outboundTickets.filter(
+    (ticket) =>
+      ticket.productSku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.handler.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 text-sm font-medium">
+            Đang tải lịch sử xuất kho...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto font-['Poppins',_sans-serif] text-slate-800 bg-white min-h-screen">
+      {/* Title */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-slate-900">
+            <ClipboardX className="w-6 h-6 text-rose-600" /> Quản Lý Xuất Kho
+            (Outbound)
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Lập phiếu xuất kho giao hàng cho đối tác và đại lý.
+          </p>
+        </div>
+
         <button
-          onClick={() => setIsOpen(true)}
-          className="bg-rose-600 hover:bg-rose-700 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
+          onClick={handleOpenModal}
+          className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
         >
-          <span>📤</span>
-          <span>Tạo phiếu xuất kho</span>
+          <Plus className="w-4 h-4" /> Tạo phiếu xuất kho
         </button>
       </div>
 
-      {/* HIỂN THỊ TRẠNG THÁI LOADING HOẶC BẢNG NHẬT KÝ */}
-      {isLoading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
-          <div className="w-10 h-10 border-4 border-rose-600/20 border-t-rose-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500 font-medium animate-pulse">
-            Đang tải nhật ký xuất kho...
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold uppercase bg-slate-50">
-                  <th className="py-3 px-6">Mã Phiếu</th>
-                  <th className="py-3 px-6">Sản phẩm</th>
-                  <th className="py-3 px-6">Số lượng xuất</th>
-                  <th className="py-3 px-6">Đối tác / Đại lý nhận</th>
-                  <th className="py-3 px-6">Thời gian</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-100">
-                {outboundTickets.map((ticket) => (
+      {/* Tìm kiếm */}
+      <div className="mb-6 relative max-w-md">
+        <input
+          type="text"
+          placeholder="Tìm theo mã SKU, tên hàng, đại lý hoặc người lập..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:bg-white transition-all"
+        />
+        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+      </div>
+
+      {/* Bảng Danh Sách */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                <th className="px-6 py-4">Mã Phiếu</th>
+                <th className="px-6 py-4">Sản Phẩm Xuất</th>
+                <th className="px-6 py-4 text-right">Số Lượng Xuất</th>
+                <th className="px-6 py-4">Đại Lý / Khách Nhận</th>
+                <th className="px-6 py-4">Thời Gian</th>
+                <th className="px-6 py-4">Người Xử Lý</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
+              {filteredTickets.length > 0 ? (
+                filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
-                    className="hover:bg-slate-50/50 transition-colors"
+                    className="hover:bg-slate-50/60 transition-all"
                   >
-                    <td className="py-4 px-6 font-mono text-xs text-rose-600 font-bold">
+                    <td className="px-6 py-4 font-semibold text-slate-900">
                       {ticket.id}
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="font-medium text-slate-900">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-800">
                         {ticket.name}
                       </div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5">
+                      <div className="text-xs font-mono text-rose-600 mt-0.5">
                         {ticket.productSku}
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-bold text-rose-600">
-                      -{ticket.qty} cái
+                    <td className="px-6 py-4 text-right font-bold text-rose-600">
+                      -{ticket.qty.toLocaleString()} cái
                     </td>
-                    <td className="py-4 px-6 text-slate-700 font-medium">
-                      {ticket.customerName}
+                    <td className="px-6 py-4 text-slate-700 font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400" />{" "}
+                        {ticket.customerName}
+                      </div>
                     </td>
-                    <td className="py-4 px-6 text-slate-500">{ticket.date}</td>
+                    <td className="px-6 py-4 text-slate-500 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />{" "}
+                        {ticket.date}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-slate-400" />{" "}
+                        {ticket.handler}
+                      </div>
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-10 text-center text-slate-400"
+                  >
+                    Chưa có lịch sử phiếu xuất kho nào được lập.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {/* MODAL LẬP PHIẾU XUẤT KHO */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 relative animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">
-              Lập phiếu xuất hàng khỏi kho
-            </h3>
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-rose-600" /> Lập Phiếu Xuất
+                Kho
+              </h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* DROPDOWN CHỌN SẢN PHẨM TỪ STORE TẬP TRUNG */}
+            <form onSubmit={handleSubmitTicket} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Chọn sản phẩm xuất
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Chọn vật tư / Sản phẩm xuất
                 </label>
-                <select
-                  {...register("productSku")}
-                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
-                >
-                  <option value="">-- Chọn mặt hàng --</option>
-                  {availableProducts.map((p) => (
-                    <option key={p.sku} value={p.sku}>
-                      {p.name} (Còn tồn: {p.qty} cái)
-                    </option>
-                  ))}
-                </select>
-                {errors.productSku && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.productSku.message}
-                  </p>
+                {products.length > 0 ? (
+                  <select
+                    value={formData.productSku}
+                    onChange={(e) =>
+                      setFormData({ ...formData, productSku: e.target.value })
+                    }
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.sku}>
+                        {p.name} ({p.sku}) — Tồn thực tế: {p.qty}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-sm text-rose-500 bg-rose-50 border border-rose-100 p-3 rounded-xl">
+                    Hiện tại chưa có sản phẩm nào để xuất.
+                  </div>
                 )}
               </div>
 
-              {/* KHU VỰC THÔNG BÁO VỊ TRÍ VÀ SỐ LƯỢNG KHẢ DỤNG */}
-              {selectedProductInfo && (
-                <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100 space-y-1 text-xs animate-in fade-in duration-200">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Vị trí kệ lấy hàng:</span>
-                    <span className="font-bold text-rose-700">
-                      📍 {selectedProductInfo.location}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Số lượng khả dụng trong kho:</span>
-                    <span className="font-bold text-rose-700">
-                      {selectedProductInfo.qty} cái
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* TÊN KHÁCH HÀNG / ĐẠI LÝ NHẬN HÀNG */}
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Khách hàng / Đại lý nhận
-                </label>
-                <input
-                  type="text"
-                  placeholder="Vui lòng nhập tên khách hàng/Đại lý"
-                  {...register("customerName")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
-                />
-                {errors.customerName && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.customerName.message}
-                  </p>
-                )}
-              </div>
-
-              {/* SỐ LƯỢNG XUẤT KHO */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Số lượng xuất
                 </label>
                 <input
-                  type="text"
-                  placeholder="Vui lòng nhập số lượng xuất"
-                  {...register("qtyToSub")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
+                  type="number"
+                  min="1"
+                  required
+                  value={formData.qty}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      qty: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all"
                 />
-                {errors.qtyToSub && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.qtyToSub.message}
-                  </p>
-                )}
               </div>
 
-              {/* NÚT ĐIỀU KHIỂN */}
-              <div className="flex justify-end space-x-3 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Tên Đại lý / Khách hàng nhận
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="..."
+                  value={formData.customerName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customerName: e.target.value })
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-150 p-3 rounded-xl text-xs text-slate-600 font-medium">
+                Người tạo phiếu: {adminName}
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
                 <button
                   type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setIsOpen(false);
-                    reset();
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
                 >
-                  Hủy
+                  <X className="w-4 h-4" /> Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors flex items-center space-x-2 disabled:bg-rose-400"
+                  disabled={products.length === 0}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
+                    products.length === 0
+                      ? "bg-slate-300 cursor-not-allowed shadow-none"
+                      : "bg-rose-600 hover:bg-rose-700"
+                  }`}
                 >
-                  {isSubmitting && (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  )}
-                  <span>
-                    {isSubmitting ? "Đang xuất kho..." : "Xác nhận xuất"}
-                  </span>
+                  <Check className="w-4 h-4" />
+                  <span>Xác nhận xuất kho</span>
                 </button>
               </div>
             </form>
