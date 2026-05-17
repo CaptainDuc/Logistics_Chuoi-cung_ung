@@ -215,7 +215,7 @@ export default function InboundPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Nhập số lượng, ví dụ: 10"
+                  placeholder="Vui lòng nhập số lượng"
                   {...register("qtyToAdd")}
                   className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
                 />
@@ -233,7 +233,7 @@ export default function InboundPage() {
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Lý do nhập kho, thông tin đối tác bổ sung..."
+                  placeholder="Lý do nhập kho"
                   {...register("note")}
                   className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 resize-none"
                 />
