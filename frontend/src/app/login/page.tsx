@@ -1,28 +1,94 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.message || "Đăng nhập thất bại. Vui lòng thử lại.");
+      } else {
+        setMessage("Đăng nhập thành công! Chuyển sang trang quét...");
+        window.setTimeout(() => router.push("/scan"), 500);
+      }
+    } catch (error) {
+      setMessage("Không thể kết nối máy chủ. Kiểm tra lại mạng.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-6">
-
-        <h1 className="text-2xl font-bold text-center mb-6">
-          Đăng nhập kho
+    <div className="min-h-screen bg-slate-950 p-4 text-slate-100">
+      <div className="mx-auto w-full max-w-sm rounded-[28px] border border-slate-700/80 bg-slate-900/95 p-6 shadow-2xl shadow-cyan-500/10">
+        <h1 className="text-center text-3xl font-semibold text-cyan-200">
+          Đăng nhập nhân viên
         </h1>
+        <p className="mt-3 text-center text-sm text-slate-400">
+          Dùng tài khoản kho để truy cập tính năng quét mã QR.
+        </p>
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full border p-3 rounded-lg mb-4"
-        />
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm text-slate-300">Email</span>
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              placeholder="nhanvien@kho.com"
+              className="mt-2 w-full rounded-3xl border border-slate-700/90 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+            />
+          </label>
 
-        <input
-          type="password"
-          placeholder="Mật khẩu"
-          className="w-full border p-3 rounded-lg mb-4"
-        />
+          <label className="block">
+            <span className="text-sm text-slate-300">Mật khẩu</span>
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              placeholder="••••••••"
+              className="mt-2 w-full rounded-3xl border border-slate-700/90 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+            />
+          </label>
 
-        <button className="w-full bg-black text-white py-3 rounded-lg">
-          Đăng nhập
-        </button>
+          {message ? (
+            <div className="rounded-3xl bg-slate-800 px-4 py-3 text-sm text-slate-200">
+              {message}
+            </div>
+          ) : null}
 
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-3xl bg-cyan-500 px-4 py-3 text-base font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Đang xử lý..." : "Đăng nhập"}
+          </button>
+        </form>
+
+        <div className="mt-5 rounded-3xl bg-slate-800/90 px-4 py-4 text-sm text-slate-400">
+          <p>Test account:</p>
+          <p className="mt-1">Email: nhanvien@kho.com</p>
+          <p>Mật khẩu: 123456</p>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function QRScanner({
   onResult,
@@ -8,18 +8,20 @@ export default function QRScanner({
   onResult: (text: string) => void;
 }) {
   const scannerRef = useRef<any>(null);
+  const [status, setStatus] = useState("Đang khởi động camera...");
 
   useEffect(() => {
-    let scanner: any;
+    let mounted = true;
 
     const init = async () => {
       const { Html5QrcodeScanner } = await import("html5-qrcode");
+      if (!mounted) return;
 
-      scanner = new Html5QrcodeScanner(
+      const scanner = new Html5QrcodeScanner(
         "qr-reader",
         {
           fps: 10,
-          qrbox: 250,
+          qrbox: { width: 260, height: 260 },
         },
         false
       );
@@ -27,40 +29,31 @@ export default function QRScanner({
       scannerRef.current = scanner;
 
       scanner.render(
-        async (text: string) => {
-          onResult(text);
-
-          await fetch("/api/inventory/scan", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ qrData: text }),
-          });
-
-          // stop scanner sau khi quét
-          scanner.clear();
+        (decodedText: string) => {
+          onResult(decodedText);
+          scanner.clear().catch(() => {});
           scannerRef.current = null;
         },
-        () => {}
+        () => {
+          setStatus("Đang tìm mã... Giữ camera ổn định.");
+        }
       );
+
+      setStatus("Camera đã sẵn sàng. Quét mã QR ngay.");
     };
 
     init();
 
     return () => {
+      mounted = false;
       scannerRef.current?.clear?.().catch(() => {});
     };
   }, [onResult]);
 
   return (
-    <div>
-      <div id="qr-reader" className="w-full" />
-
-      {/* không cần bấm nút nữa, auto mở camera */}
-      <p className="text-sm text-gray-400 mt-2 text-center">
-        Đang khởi động camera...
-      </p>
+    <div className="h-full">
+      <div id="qr-reader" className="h-full min-h-[320px] w-full" />
+      <p className="mt-3 text-center text-sm text-slate-300">{status}</p>
     </div>
   );
 }
