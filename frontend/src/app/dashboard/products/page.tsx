@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   Edit2,
@@ -11,97 +11,94 @@ import {
   X,
   Lock,
 } from "lucide-react";
-
-// Định nghĩa kiểu dữ liệu cho Sản phẩm (Đã bỏ category)
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  quantity: number;
-  price: number;
-}
+import { useWarehouseStore, Product } from "@/store/useWarehouseStore";
 
 export default function ProductsPage() {
-  // Dữ liệu mẫu (Sau này Đức sẽ gọi từ useWarehouseStore ra nhé)
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "Thùng Carton Size L",
-      sku: "PROD-A8B2C4",
-      quantity: 150,
-      price: 15000,
-    },
-    {
-      id: "2",
-      name: "Pallet Gỗ Tràm",
-      sku: "PROD-F5E6D7",
-      quantity: 45,
-      price: 250000,
-    },
-  ]);
+  // Lấy dữ liệu và các hàm quản lý từ Zustand Store của Đức
+  const {
+    products,
+    isLoading,
+    initializeData,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+  } = useWarehouseStore();
+
+  // Gọi khởi tạo dữ liệu khi trang được tải lên
+  useEffect(() => {
+    initializeData();
+  }, [initializeData]);
 
   // State Quản lý Tìm kiếm & Bộ lọc
   const [searchTerm, setSearchTerm] = useState("");
 
-  // State Quản lý Đóng/Mở Modal và Dữ liệu Form
+  // State Quản lý Đóng/Mở Modal và Dữ liệu Form (Đồng bộ id dạng number, có location và qty)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
-    quantity: 0,
-    price: 0,
+    location: "",
+    qty: 0,
   });
 
-  // Hàm sinh mã SKU tự động ngẫu nhiên (Ví dụ: PROD-7B3A9C)
+  // Hàm sinh mã SKU tự động ngẫu nhiên theo cấu trúc SKU-X1-XXXX
   const generateAutoSKU = (): string => {
-    const chars = "0123456789ABCDEF";
-    let result = "";
-    for (let i = 0; i < 6; i++) {
-      result += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return `PROD-${result}`;
+    const zones = ["A1", "B2", "C3", "D4"];
+    const randomZone = zones[Math.floor(Math.random() * zones.length)];
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `SKU-${randomZone}-${randomNum}`;
   };
 
   // Xử lý khi mở modal Thêm mới
   const handleOpenAddModal = () => {
     setEditingProduct(null);
-    // Tự động tạo mã SKU mới luôn khi bấm nút Thêm
-    setFormData({ name: "", sku: generateAutoSKU(), quantity: 0, price: 0 });
+    setFormData({
+      name: "",
+      sku: generateAutoSKU(),
+      location: "Khu A - Kệ 1",
+      qty: 0,
+    });
     setIsModalOpen(true);
   };
 
   // Xử lý khi mở modal Sửa
   const handleOpenEditModal = (product: Product) => {
     setEditingProduct(product);
-    setFormData({ ...product });
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      location: product.location,
+      qty: product.qty,
+    });
     setIsModalOpen(true);
   };
 
-  // Xử lý Xóa sản phẩm
-  const handleDelete = (id: string) => {
+  // Xử lý Xóa sản phẩm sử dụng ID number của Store
+  const handleDelete = (id: number) => {
     if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) {
-      setProducts(products.filter((p) => p.id !== id));
+      deleteProduct(id);
     }
   };
 
-  // Xử lý Lưu Form (Cả Thêm và Sửa)
+  // Xử lý Lưu Form
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct) {
-      // Logic SỬA/CẬP NHẬT
-      setProducts(
-        products.map((p) =>
-          p.id === editingProduct.id ? { ...p, ...formData } : p
-        )
-      );
+      // Gọi action updateProduct từ store của Đức
+      updateProduct(editingProduct.id, {
+        name: formData.name,
+        location: formData.location,
+        qty: formData.qty,
+      });
     } else {
-      // Logic THÊM MỚI (Mã SKU đã được tạo sẵn từ bước mở modal)
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        ...formData,
-      };
-      setProducts([...products, newProduct]);
+      // Gọi action addProduct từ store (Omit ID vì store tự tăng id: state.products.length + 1)
+      addProduct({
+        sku: formData.sku,
+        name: formData.name,
+        location: formData.location,
+        qty: formData.qty,
+      });
     }
     setIsModalOpen(false);
   };
@@ -112,6 +109,19 @@ export default function ProductsPage() {
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 text-sm font-medium">
+            Đang tải dữ liệu kho hàng...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto font-['Poppins',_sans-serif] text-slate-800 bg-white min-h-screen">
@@ -156,8 +166,8 @@ export default function ProductsPage() {
               <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
                 <th className="px-6 py-4">Mã SKU (Hệ thống)</th>
                 <th className="px-6 py-4">Tên Sản Phẩm</th>
+                <th className="px-6 py-4">Vị Trí Kệ</th>
                 <th className="px-6 py-4 text-right">Số Lượng</th>
-                <th className="px-6 py-4 text-right">Giá Thành</th>
                 <th className="px-6 py-4 text-center">Thao Tác</th>
               </tr>
             </thead>
@@ -174,19 +184,19 @@ export default function ProductsPage() {
                     <td className="px-6 py-4 font-medium text-slate-900">
                       {product.name}
                     </td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {product.location}
+                    </td>
                     <td className="px-6 py-4 text-right font-semibold">
                       <span
                         className={`px-2.5 py-1 rounded-md text-xs ${
-                          product.quantity < 50
+                          product.qty < 15
                             ? "bg-amber-50 text-amber-600"
                             : "bg-emerald-50 text-emerald-600"
                         }`}
                       >
-                        {product.quantity.toLocaleString()}
+                        {product.qty.toLocaleString()} cái
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium text-slate-700">
-                      {product.price.toLocaleString()} đ
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -254,7 +264,7 @@ export default function ProductsPage() {
                 </label>
                 <input
                   type="text"
-                  disabled={!!editingProduct} // Khóa hoàn toàn ô nhập nếu đang ở trạng thái sửa
+                  disabled={!!editingProduct}
                   value={formData.sku}
                   className={`w-full border border-slate-200 rounded-xl px-4 py-2 text-sm font-mono font-semibold outline-none transition-all ${
                     editingProduct
@@ -262,11 +272,6 @@ export default function ProductsPage() {
                       : "bg-slate-50 text-indigo-600 focus:border-indigo-500"
                   }`}
                 />
-                <p className="text-xs text-slate-400 mt-1">
-                  {editingProduct
-                    ? ""
-                    : "Mã SKU được hệ thống tạo ngẫu nhiên tự động."}
-                </p>
               </div>
 
               {/* Trường Tên sản phẩm */}
@@ -285,39 +290,36 @@ export default function ProductsPage() {
                 />
               </div>
 
-              {/* Hàng chứa Số lượng và Giá thành */}
+              {/* Hàng chứa Vị trí kệ và Số lượng */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Số lượng
+                    Vị trí kho/kệ
                   </label>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
                     required
-                    value={formData.quantity}
+                    placeholder="Ví dụ: Khu A - Kệ 1"
+                    value={formData.location}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        quantity: parseInt(e.target.value) || 0,
-                      })
+                      setFormData({ ...formData, location: e.target.value })
                     }
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Giá thành (đ)
+                    Số lượng tồn (qty)
                   </label>
                   <input
                     type="number"
                     min="0"
                     required
-                    value={formData.price}
+                    value={formData.qty}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        price: parseInt(e.target.value) || 0,
+                        qty: parseInt(e.target.value) || 0,
                       })
                     }
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all"
