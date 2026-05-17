@@ -58,7 +58,7 @@ export default function DashboardPage() {
       {/* HEADER */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Tổng quan Hệ thống
+          Tổng quan hệ thống
         </h1>
         <p className="text-sm text-slate-500 mt-1">
           Số liệu phân tích, cảnh báo tồn kho và nhật ký vận hành kho thời gian

@@ -103,7 +103,7 @@ export default function OutboundPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý Xuất kho (Outbound)
+            Quản lý xuất kho
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Lập phiếu xuất hàng, kiểm tra giới hạn tồn và lưu nhật ký đơn xuất.

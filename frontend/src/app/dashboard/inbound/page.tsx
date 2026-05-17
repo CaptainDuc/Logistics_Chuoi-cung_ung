@@ -86,7 +86,7 @@ export default function InboundPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý Nhập kho (Inbound)
+            Quản lý nhập kho
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Lập phiếu nhập kho bổ sung số lượng và theo dõi lịch sử nhập hàng.

@@ -126,7 +126,7 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý Sản phẩm
+            Quản lý sản phẩm
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Danh mục hàng hóa tổng thể và vị trí lưu trữ trong kho bãi.
@@ -241,7 +241,7 @@ export default function ProductsPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Tai nghe Sony WH-CH720N..."
+                  placeholder="..."
                   {...register("name")}
                   className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
                 />
