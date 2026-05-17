@@ -61,7 +61,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-xs font-semibold text-red-500 uppercase tracking-wider">
-              Tồn kho nguy hiểm
+              Hàng hóa sắp hết
             </p>
             <p className="text-2xl font-bold text-red-700 mt-0.5">2 mặt hàng</p>
           </div>

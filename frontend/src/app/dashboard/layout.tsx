@@ -57,6 +57,14 @@ export default function DashboardLayout({
               <span className="font-medium text-sm">Quản lý sản phẩm</span>
             )}
           </Link>
+          {/* Thêm mục Quản lý Nhập kho */}
+          <Link
+            href="/dashboard/inbound"
+            className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
+          >
+            <span>📥</span>
+            <span>Quản lý nhập kho</span>
+          </Link>
         </nav>
 
         {/* THÔNG TIN BẢN QUYỀN HOẶC PHIÊN BẢN */}
@@ -93,9 +101,7 @@ export default function DashboardLayout({
         </header>
 
         {/* NƠI HIỂN THỊ CHẠY RUỘT CỦA CÁC TRANG CON VÀO ĐÂY */}
-        <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto">
-          {children}
-        </main>
+        <main className="flex-1 p-6 max-w-1600 w-full mx-auto">{children}</main>
       </div>
     </div>
   );
