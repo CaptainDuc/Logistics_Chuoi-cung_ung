@@ -1,299 +1,345 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import React, { useState } from "react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Search,
+  Package,
+  Check,
+  X,
+  Lock,
+} from "lucide-react";
 
-// 1. ĐỊNH NGHĨA VALIDATION SCHEMA VỚI ZOD (Đồng bộ kiểu string với Form Input để tránh lỗi TS)
-const productSchema = z.object({
-  sku: z
-    .string()
-    .min(1, { message: "Mã SKU sẽ được hệ thống tự động sinh ra" }),
-  name: z.string().min(5, { message: "Tên sản phẩm phải có ít nhất 5 ký tự" }),
-  qty: z
-    .string()
-    .min(1, { message: "Số lượng không được để trống" })
-    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Số lượng tồn phải là số và lớn hơn 0",
-    }),
-  location: z
-    .string()
-    .min(1, { message: "Vui lòng chọn vị trí kho còn trống" }),
-});
-
-interface ProductFormValues {
-  sku: string;
+// Định nghĩa kiểu dữ liệu cho Sản phẩm (Đã bỏ category)
+interface Product {
+  id: string;
   name: string;
-  qty: string;
-  location: string;
+  sku: string;
+  quantity: number;
+  price: number;
 }
 
 export default function ProductsPage() {
-  const [isOpen, setIsOpen] = useState(false);
+  // Dữ liệu mẫu (Sau này Đức sẽ gọi từ useWarehouseStore ra nhé)
+  const [products, setProducts] = useState<Product[]>([
+    {
+      id: "1",
+      name: "Thùng Carton Size L",
+      sku: "PROD-A8B2C4",
+      quantity: 150,
+      price: 15000,
+    },
+    {
+      id: "2",
+      name: "Pallet Gỗ Tràm",
+      sku: "PROD-F5E6D7",
+      quantity: 45,
+      price: 250000,
+    },
+  ]);
 
-  // CÁC STATE QUẢN LÝ DỮ LIỆU VÀ GIẢ LẬP LOADING STATE
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Loading khi vừa vào trang
-  const [isSubmitting, setIsSubmitting] = useState(false); // Loading khi bấm submit form
+  // State Quản lý Tìm kiếm & Bộ lọc
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // DANH SÁCH CÁC VỊ TRÍ KHO TRỐNG KHẢ DỤNG
-  const availableLocations = [
-    { code: "A1", name: "Khu A - Kệ 1" },
-    { code: "B3", name: "Khu B - Kệ 3" },
-    { code: "C2", name: "Khu C - Kệ 2" },
-    { code: "D4", name: "Khu D - Kệ 4" },
-  ];
-
-  // GIẢ LẬP ĐỘ TRỄ KHI MỞ TRANG (Mô phỏng lấy dữ liệu từ Server mất 1.5 giây)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setProducts([
-        {
-          id: 1,
-          sku: "SKU-A1-1024",
-          name: "Tai nghe Sony WH-CH720N (Black)",
-          location: "Khu A - Kệ 1",
-          qty: 15,
-        },
-        {
-          id: 2,
-          sku: "SKU-B3-8842",
-          name: "iPhone 17 Pro Max 256GB",
-          location: "Khu B - Kệ 3",
-          qty: 45,
-        },
-      ]);
-      setIsLoading(false);
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // KHỞI TẠO HOOK FORM
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: { sku: "HỆ THỐNG TỰ SINH", name: "", qty: "", location: "" },
+  // State Quản lý Đóng/Mở Modal và Dữ liệu Form
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    sku: "",
+    quantity: 0,
+    price: 0,
   });
 
-  // LOGIC TỰ ĐỘNG SINH MÃ SKU THEO VỊ TRÍ KHO
-  const watchedLocation = watch("location");
-
-  useEffect(() => {
-    if (watchedLocation && watchedLocation !== "") {
-      const randomNumber = Math.floor(1000 + Math.random() * 9000);
-      const autoSku = `SKU-${watchedLocation}-${randomNumber}`;
-      setValue("sku", autoSku, { shouldValidate: true });
-    } else {
-      setValue("sku", "HỆ THỐNG TỰ SINH");
+  // Hàm sinh mã SKU tự động ngẫu nhiên (Ví dụ: PROD-7B3A9C)
+  const generateAutoSKU = (): string => {
+    const chars = "0123456789ABCDEF";
+    let result = "";
+    for (let i = 0; i < 6; i++) {
+      result += chars[Math.floor(Math.random() * chars.length)];
     }
-  }, [watchedLocation, setValue]);
-
-  const generatedSku = watch("sku");
-
-  // GIẢ LẬP LƯU DỮ LIỆU LÊN SERVER KHI SUBMIT (Mất 1 giây xử lý)
-  const onSubmit = (data: ProductFormValues) => {
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      const newProduct = {
-        id: products.length + 1,
-        sku: generatedSku,
-        name: data.name,
-        location:
-          availableLocations.find((l) => l.code === data.location)?.name ||
-          data.location,
-        qty: Number(data.qty),
-      };
-
-      setProducts([newProduct, ...products]);
-      setIsSubmitting(false);
-      setIsOpen(false);
-      reset();
-    }, 1000);
+    return `PROD-${result}`;
   };
 
+  // Xử lý khi mở modal Thêm mới
+  const handleOpenAddModal = () => {
+    setEditingProduct(null);
+    // Tự động tạo mã SKU mới luôn khi bấm nút Thêm
+    setFormData({ name: "", sku: generateAutoSKU(), quantity: 0, price: 0 });
+    setIsModalOpen(true);
+  };
+
+  // Xử lý khi mở modal Sửa
+  const handleOpenEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({ ...product });
+    setIsModalOpen(true);
+  };
+
+  // Xử lý Xóa sản phẩm
+  const handleDelete = (id: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) {
+      setProducts(products.filter((p) => p.id !== id));
+    }
+  };
+
+  // Xử lý Lưu Form (Cả Thêm và Sửa)
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProduct) {
+      // Logic SỬA/CẬP NHẬT
+      setProducts(
+        products.map((p) =>
+          p.id === editingProduct.id ? { ...p, ...formData } : p
+        )
+      );
+    } else {
+      // Logic THÊM MỚI (Mã SKU đã được tạo sẵn từ bước mở modal)
+      const newProduct: Product = {
+        id: Date.now().toString(),
+        ...formData,
+      };
+      setProducts([...products, newProduct]);
+    }
+    setIsModalOpen(false);
+  };
+
+  // Lọc sản phẩm theo từ khóa tìm kiếm (Tên hoặc mã SKU)
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="space-y-6">
-      {/* HEADER & NÚT THÊM SẢN PHẨM */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-6 max-w-7xl mx-auto font-['Poppins',_sans-serif] text-slate-800 bg-white min-h-screen">
+      {/* Tiêu đề trang */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý sản phẩm
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-slate-900">
+            <Package className="w-6 h-6 text-indigo-600" /> Quản Lý Sản Phẩm
+            Trong Kho
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Danh mục hàng hóa tổng thể và vị trí lưu trữ trong kho bãi.
+            Thêm, sửa, xóa và cập nhật thông tin hàng hóa vật tư.
           </p>
         </div>
+
+        {/* Nút Thêm mới */}
         <button
-          onClick={() => setIsOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
         >
-          <span>➕</span>
-          <span>Thêm sản phẩm mới</span>
+          <Plus className="w-4 h-4" /> Thêm sản phẩm
         </button>
       </div>
 
-      {/* HIỂN THỊ LOADING HOẶC BẢNG DỮ LIỆU */}
-      {isLoading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
-          <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500 font-medium animate-pulse">
-            Đang tải danh sách kho hàng...
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold uppercase bg-slate-50">
-                  <th className="py-3 px-6">Mã SKU</th>
-                  <th className="py-3 px-6">Tên mặt hàng</th>
-                  <th className="py-3 px-6">Vị trí kệ hàng</th>
-                  <th className="py-3 px-6">Số lượng tồn</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-100">
-                {products.map((product) => (
+      {/* Thanh Tìm Kiếm */}
+      <div className="mb-6 relative max-w-md">
+        <input
+          type="text"
+          placeholder="Tìm theo tên hoặc mã SKU..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all"
+        />
+        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+      </div>
+
+      {/* Bảng Danh Sách Sản Phẩm */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                <th className="px-6 py-4">Mã SKU (Hệ thống)</th>
+                <th className="px-6 py-4">Tên Sản Phẩm</th>
+                <th className="px-6 py-4 text-right">Số Lượng</th>
+                <th className="px-6 py-4 text-right">Giá Thành</th>
+                <th className="px-6 py-4 text-center">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => (
                   <tr
                     key={product.id}
-                    className="hover:bg-slate-50/50 transition-colors"
+                    className="hover:bg-slate-50/60 transition-all"
                   >
-                    <td className="py-4 px-6 font-mono text-xs text-blue-600 font-bold">
+                    <td className="px-6 py-4 font-mono text-xs text-indigo-600 font-semibold">
                       {product.sku}
                     </td>
-                    <td className="py-4 px-6 font-medium text-slate-900">
+                    <td className="px-6 py-4 font-medium text-slate-900">
                       {product.name}
                     </td>
-                    <td className="py-4 px-6 text-slate-600">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                        📍 {product.location}
+                    <td className="px-6 py-4 text-right font-semibold">
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-xs ${
+                          product.quantity < 50
+                            ? "bg-amber-50 text-amber-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }`}
+                      >
+                        {product.quantity.toLocaleString()}
                       </span>
                     </td>
-                    <td className="py-4 px-6 font-bold text-slate-700">
-                      {product.qty} cái
+                    <td className="px-6 py-4 text-right font-medium text-slate-700">
+                      {product.price.toLocaleString()} đ
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {/* Nút Sửa */}
+                        <button
+                          onClick={() => handleOpenEditModal(product)}
+                          className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 rounded-lg transition-all"
+                          title="Sửa sản phẩm"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {/* Nút Xóa */}
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-rose-600 rounded-lg transition-all"
+                          title="Xóa sản phẩm"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-10 text-center text-slate-400"
+                  >
+                    Không tìm thấy sản phẩm nào phù hợp.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
-      {/* MODAL THÊM SẢN PHẨM MỚI */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 relative animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">
-              Khai báo thông tin hàng hóa
-            </h3>
+      {/* MODAL: FORM THÊM / SỬA (CẬP NHẬT) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Modal */}
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editingProduct ? "Cập Nhật Sản Phẩm" : "Thêm Sản Phẩm Mới"}
+              </h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* CHỌN VỊ TRÍ KHO */}
+            {/* Form Nội dung */}
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {/* Trường Mã SKU (Tự động tạo / Khóa khi sửa) */}
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Vị trí kệ xếp hàng
-                </label>
-                <select
-                  {...register("location")}
-                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
-                >
-                  <option value="">-- Chọn vị trí trống --</option>
-                  {availableLocations.map((loc) => (
-                    <option key={loc.code} value={loc.code}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.location && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.location.message}
-                  </p>
-                )}
-              </div>
-
-              {/* MÃ SKU (BỊ KHÓA INPUT - CHỈ ĐỂ XEM) */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-                  Mã SKU Hệ Thống
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  Mã SKU{" "}
+                  {editingProduct && (
+                    <Lock className="w-3 h-3 text-slate-400" />
+                  )}
                 </label>
                 <input
                   type="text"
-                  disabled
-                  {...register("sku")}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono text-slate-500 font-bold cursor-not-allowed"
+                  disabled={!!editingProduct} // Khóa hoàn toàn ô nhập nếu đang ở trạng thái sửa
+                  value={formData.sku}
+                  className={`w-full border border-slate-200 rounded-xl px-4 py-2 text-sm font-mono font-semibold outline-none transition-all ${
+                    editingProduct
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed select-none"
+                      : "bg-slate-50 text-indigo-600 focus:border-indigo-500"
+                  }`}
                 />
+                <p className="text-xs text-slate-400 mt-1">
+                  {editingProduct
+                    ? ""
+                    : "Mã SKU được hệ thống tạo ngẫu nhiên tự động."}
+                </p>
               </div>
 
-              {/* TÊN SẢN PHẨM */}
+              {/* Trường Tên sản phẩm */}
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Tên sản phẩm
                 </label>
                 <input
                   type="text"
-                  placeholder="..."
-                  {...register("name")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
+                  required
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all"
                 />
-                {errors.name && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.name.message}
-                  </p>
-                )}
               </div>
 
-              {/* SỐ LƯỢNG BAN ĐẦU */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Số lượng nhập kho ban đầu
-                </label>
-                <input
-                  type="text"
-                  placeholder="0"
-                  {...register("qty")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
-                />
-                {errors.qty && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.qty.message}
-                  </p>
-                )}
+              {/* Hàng chứa Số lượng và Giá thành */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Số lượng
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.quantity}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        quantity: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Giá thành (đ)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.price}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        price: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all"
+                  />
+                </div>
               </div>
 
-              {/* NÚT ĐIỀU KHIỂN */}
-              <div className="flex justify-end space-x-3 pt-2">
+              {/* Footer Modal Actions */}
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
                 <button
                   type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setIsOpen(false);
-                    reset();
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
                 >
-                  Hủy
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center space-x-2 disabled:bg-blue-400"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md"
                 >
-                  {isSubmitting && (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  )}
-                  <span>
-                    {isSubmitting ? "Đang lưu kho..." : "Xác nhận thêm"}
-                  </span>
+                  <Check className="w-4 h-4" />
+                  <span>{editingProduct ? "Cập nhật" : "Xác nhận"}</span>
                 </button>
               </div>
             </form>
