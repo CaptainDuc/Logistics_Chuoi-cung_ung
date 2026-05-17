@@ -1,60 +1,66 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
 
 export default function QRScanner({
   onResult,
 }: {
   onResult: (text: string) => void;
 }) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
-    return () => {
-      scannerRef.current?.clear().catch(() => {});
+    let scanner: any;
+
+    const init = async () => {
+      const { Html5QrcodeScanner } = await import("html5-qrcode");
+
+      scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        {
+          fps: 10,
+          qrbox: 250,
+        },
+        false
+      );
+
+      scannerRef.current = scanner;
+
+      scanner.render(
+        async (text: string) => {
+          onResult(text);
+
+          await fetch("/api/inventory/scan", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ qrData: text }),
+          });
+
+          // stop scanner sau khi quét
+          scanner.clear();
+          scannerRef.current = null;
+        },
+        () => {}
+      );
     };
-  }, []);
 
-  const startScanner = () => {
-    if (scannerRef.current) return;
+    init();
 
-    scannerRef.current = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: 250,
-      },
-      false
-    );
-
-    scannerRef.current.render(
-      async (text) => {
-        onResult(text);
-
-        await fetch("/api/inventory/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qrData: text }),
-        });
-
-        // stop sau khi quét
-        scannerRef.current?.clear().catch(() => {});
-        scannerRef.current = null;
-      },
-      () => {}
-    );
-  };
+    return () => {
+      scannerRef.current?.clear?.().catch(() => {});
+    };
+  }, [onResult]);
 
   return (
     <div>
       <div id="qr-reader" className="w-full" />
-      <button
-        onClick={startScanner}
-        className="w-full bg-blue-500 py-2 rounded mt-4"
-      >
-        Mở camera
-      </button>
+
+      {/* không cần bấm nút nữa, auto mở camera */}
+      <p className="text-sm text-gray-400 mt-2 text-center">
+        Đang khởi động camera...
+      </p>
     </div>
   );
 }
