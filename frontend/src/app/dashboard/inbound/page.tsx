@@ -5,20 +5,32 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-interface OutboundFormValues {
+const inboundSchema = z.object({
+  productSku: z
+    .string()
+    .min(1, { message: "Vui lòng chọn sản phẩm cần nhập kho" }),
+  qtyToAdd: z
+    .string()
+    .min(1, { message: "Số lượng nhập không được để trống" })
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+      message: "Số lượng nhập phải là số dương lớn hơn 0",
+    }),
+  note: z.string().optional(),
+});
+
+interface InboundFormValues {
   productSku: string;
-  qtyToSub: string;
-  customerName: string;
+  qtyToAdd: string;
   note?: string;
 }
 
-export default function OutboundPage() {
+export default function InboundPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [outboundTickets, setOutboundTickets] = useState<any[]>([]);
+  const [inboundTickets, setInboundTickets] = useState<any[]>([]);
 
   // Giả lập tải dữ liệu từ Server mất 1.5s
   useEffect(() => {
@@ -43,15 +55,15 @@ export default function OutboundPage() {
           currentQty: 12,
         },
       ]);
-      setOutboundTickets([
+      setInboundTickets([
         {
-          id: "OP-2026-001",
-          sku: "SKU-C2-4915",
-          name: "Hộp carton đóng gói size M",
-          qty: 5,
-          date: "2026-05-17 10:15",
+          id: "IP-2026-001",
+          sku: "SKU-B3-8842",
+          name: "iPhone 17 Pro Max 256GB",
+          qty: 20,
+          date: "2026-05-15 09:30",
           handler: "Trần Minh Đức",
-          customer: "Cửa hàng Đại lý Quận 9",
+          note: "Nhập hàng bổ sung đợt 1",
         },
       ]);
       setIsLoading(false);
@@ -59,45 +71,15 @@ export default function OutboundPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Zod SuperRefine chống xuất âm kho
-  const outboundSchema = z
-    .object({
-      productSku: z
-        .string()
-        .min(1, { message: "Vui lòng chọn sản phẩm cần xuất kho" }),
-      qtyToSub: z
-        .string()
-        .min(1, { message: "Số lượng xuất không được để trống" })
-        .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-          message: "Số lượng xuất phải là số dương lớn hơn 0",
-        }),
-      customerName: z
-        .string()
-        .min(3, { message: "Tên khách nhận phải từ 3 ký tự" }),
-      note: z.string().optional(),
-    })
-    .superRefine((data, ctx) => {
-      const targetProduct = availableProducts.find(
-        (p) => p.sku === data.productSku
-      );
-      if (targetProduct && Number(data.qtyToSub) > targetProduct.currentQty) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["qtyToSub"],
-          message: `Vượt quá giới hạn! Kho chỉ còn lại tối đa ${targetProduct.currentQty} cái.`,
-        });
-      }
-    });
-
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
     watch,
-  } = useForm<OutboundFormValues>({
-    resolver: zodResolver(outboundSchema),
-    defaultValues: { productSku: "", qtyToSub: "", customerName: "", note: "" },
+  } = useForm<InboundFormValues>({
+    resolver: zodResolver(inboundSchema),
+    defaultValues: { productSku: "", qtyToAdd: "", note: "" },
   });
 
   const watchedSku = watch("productSku");
@@ -105,8 +87,8 @@ export default function OutboundPage() {
     (p) => p.sku === watchedSku
   );
 
-  // Giả lập lưu phiếu xuất kho mất 1s
-  const onSubmit = (data: OutboundFormValues) => {
+  // Giả lập lưu phiếu nhập kho mất 1s
+  const onSubmit = (data: InboundFormValues) => {
     setIsSubmitting(true);
     setTimeout(() => {
       const targetProduct = availableProducts.find(
@@ -114,25 +96,25 @@ export default function OutboundPage() {
       );
       if (!targetProduct) return;
 
-      const numQtyToSub = Number(data.qtyToSub);
+      const numQtyToAdd = Number(data.qtyToAdd);
       const newTicket = {
-        id: `OP-2026-00${outboundTickets.length + 1}`,
+        id: `IP-2026-00${inboundTickets.length + 1}`,
         sku: data.productSku,
         name: targetProduct.name,
-        qty: numQtyToSub,
+        qty: numQtyToAdd,
         date: new Date().toISOString().replace("T", " ").substring(0, 16),
         handler: "Trần Minh Đức",
-        customer: data.customerName,
+        note: data.note || "Không có ghi chú",
       };
 
       setAvailableProducts((prev) =>
         prev.map((p) =>
           p.sku === data.productSku
-            ? { ...p, currentQty: p.currentQty - numQtyToSub }
+            ? { ...p, currentQty: p.currentQty + numQtyToAdd }
             : p
         )
       );
-      setOutboundTickets([newTicket, ...outboundTickets]);
+      setInboundTickets([newTicket, ...inboundTickets]);
       setIsSubmitting(false);
       setIsOpen(false);
       reset();
@@ -144,26 +126,26 @@ export default function OutboundPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý Xuất kho (Outbound)
+            Quản lý Nhập kho (Inbound)
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập phiếu xuất hàng, kiểm tra giới hạn tồn và lưu nhật ký đơn xuất.
+            Lập phiếu nhập kho bổ sung số lượng và theo dõi lịch sử nhập hàng.
           </p>
         </div>
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-rose-600 hover:bg-rose-700 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
         >
-          <span>📤</span>
-          <span>Tạo phiếu xuất kho</span>
+          <span>📥</span>
+          <span>Tạo phiếu nhập kho</span>
         </button>
       </div>
 
       {isLoading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
-          <div className="w-10 h-10 border-4 border-rose-600/20 border-t-rose-600 rounded-full animate-spin"></div>
+          <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
           <p className="text-sm text-slate-500 font-medium">
-            Đang tải nhật ký xuất kho...
+            Đang tải nhật ký nhập kho...
           </p>
         </div>
       ) : (
@@ -174,18 +156,18 @@ export default function OutboundPage() {
                 <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold uppercase bg-slate-50">
                   <th className="py-3 px-6">Mã Phiếu</th>
                   <th className="py-3 px-6">Sản phẩm</th>
-                  <th className="py-3 px-6">Số lượng xuất</th>
-                  <th className="py-3 px-6">Khách nhận</th>
+                  <th className="py-3 px-6">Số lượng nhập</th>
                   <th className="py-3 px-6">Thời gian</th>
+                  <th className="py-3 px-6">Người thực hiện</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-slate-100">
-                {outboundTickets.map((ticket) => (
+                {inboundTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     className="hover:bg-slate-50/50 transition-colors"
                   >
-                    <td className="py-4 px-6 font-mono text-xs text-rose-600 font-bold">
+                    <td className="py-4 px-6 font-mono text-xs text-blue-600 font-bold">
                       {ticket.id}
                     </td>
                     <td className="py-4 px-6">
@@ -196,13 +178,13 @@ export default function OutboundPage() {
                         {ticket.sku}
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-bold text-rose-600">
-                      -{ticket.qty} cái
-                    </td>
-                    <td className="py-4 px-6 text-slate-700 font-medium">
-                      {ticket.customer}
+                    <td className="py-4 px-6 font-bold text-blue-600">
+                      +{ticket.qty} cái
                     </td>
                     <td className="py-4 px-6 text-slate-500">{ticket.date}</td>
+                    <td className="py-4 px-6 text-slate-700 font-medium">
+                      {ticket.handler}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -215,21 +197,21 @@ export default function OutboundPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 relative animate-in fade-in zoom-in-95 duration-150">
             <h3 className="text-lg font-bold text-slate-900 mb-4">
-              Lập phiếu xuất hàng khỏi kho
+              Lập phiếu nhập kho mới
             </h3>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Chọn sản phẩm xuất
+                  Chọn sản phẩm
                 </label>
                 <select
                   {...register("productSku")}
-                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
+                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
                 >
                   <option value="">-- Chọn mặt hàng --</option>
                   {availableProducts.map((p) => (
                     <option key={p.sku} value={p.sku}>
-                      {p.name} (Còn {p.currentQty} cái)
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -241,16 +223,16 @@ export default function OutboundPage() {
               </div>
 
               {selectedProductInfo && (
-                <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100 space-y-1 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Vị trí kệ lấy hàng:</span>
-                    <span className="font-bold text-rose-700">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Vị trí kho:</span>
+                    <span className="font-bold text-slate-700">
                       {selectedProductInfo.location}
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Số lượng khả dụng:</span>
-                    <span className="font-bold text-rose-700">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Số lượng tồn hiện tại:</span>
+                    <span className="font-bold text-slate-700">
                       {selectedProductInfo.currentQty} cái
                     </span>
                   </div>
@@ -259,36 +241,31 @@ export default function OutboundPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Khách hàng / Đại lý nhận
+                  Số lượng thực nhập
                 </label>
                 <input
                   type="text"
-                  placeholder="Tên đại lý..."
-                  {...register("customerName")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
+                  placeholder="0"
+                  {...register("qtyToAdd")}
+                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
                 />
-                {errors.customerName && (
+                {errors.qtyToAdd && (
                   <p className="text-xs text-red-500 mt-1">
-                    {errors.customerName.message}
+                    {errors.qtyToAdd.message}
                   </p>
                 )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Số lượng xuất
+                  Ghi chú
                 </label>
-                <input
-                  type="text"
-                  placeholder="0"
-                  {...register("qtyToSub")}
-                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
+                <textarea
+                  rows={2}
+                  placeholder="Lý do nhập kho..."
+                  {...register("note")}
+                  className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 resize-none"
                 />
-                {errors.qtyToSub && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.qtyToSub.message}
-                  </p>
-                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-2">
@@ -306,13 +283,13 @@ export default function OutboundPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center space-x-2 disabled:bg-rose-400"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center space-x-2 disabled:bg-blue-400"
                 >
                   {isSubmitting && (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   )}
                   <span>
-                    {isSubmitting ? "Đang xuất kho..." : "Xác nhận xuất"}
+                    {isSubmitting ? "Đang thực hiện..." : "Xác nhận nhập"}
                   </span>
                 </button>
               </div>
