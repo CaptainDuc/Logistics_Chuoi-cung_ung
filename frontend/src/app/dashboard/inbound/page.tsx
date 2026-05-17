@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useWarehouseStore } from "@/store/useWarehouseStore";
 
+// 1. ĐỊNH NGHĨA VALIDATION SCHEMA VỚI ZOD
 const inboundSchema = z.object({
   productSku: z
     .string()
@@ -26,51 +28,23 @@ interface InboundFormValues {
 
 export default function InboundPage() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [inboundTickets, setInboundTickets] = useState<any[]>([]);
+  // 2. KẾT NỐI VÀ LẤY DỮ LIỆU TỪ ZUSTAND STORE TẬP TRUNG
+  const {
+    products: availableProducts,
+    inboundTickets,
+    isLoading,
+    initializeData,
+    addInboundTicket,
+  } = useWarehouseStore();
 
-  // Giả lập tải dữ liệu từ Server mất 1.5s
+  // 3. TỰ ĐỘNG KHỞI TẠO DỮ LIỆU KHI VÀO TRANG
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAvailableProducts([
-        {
-          sku: "SKU-A1-1024",
-          name: "Tai nghe Sony WH-CH720N (Black)",
-          location: "Khu A - Kệ 1",
-          currentQty: 15,
-        },
-        {
-          sku: "SKU-B3-8842",
-          name: "iPhone 17 Pro Max 256GB",
-          location: "Khu B - Kệ 3",
-          currentQty: 45,
-        },
-        {
-          sku: "SKU-C2-4915",
-          name: "Hộp carton đóng gói size M",
-          location: "Khu C - Kệ 2",
-          currentQty: 12,
-        },
-      ]);
-      setInboundTickets([
-        {
-          id: "IP-2026-001",
-          sku: "SKU-B3-8842",
-          name: "iPhone 17 Pro Max 256GB",
-          qty: 20,
-          date: "2026-05-15 09:30",
-          handler: "Trần Minh Đức",
-          note: "Nhập hàng bổ sung đợt 1",
-        },
-      ]);
-      setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    initializeData();
+  }, [initializeData]);
 
+  // KHỞI TẠO HOOK FORM
   const {
     register,
     handleSubmit,
@@ -82,39 +56,24 @@ export default function InboundPage() {
     defaultValues: { productSku: "", qtyToAdd: "", note: "" },
   });
 
+  // THEO DÕI SẢN PHẨM ĐANG ĐƯỢC CHỌN ĐỂ HIỂN THỊ THÔNG TIN CHI TIẾT
   const watchedSku = watch("productSku");
   const selectedProductInfo = availableProducts.find(
     (p) => p.sku === watchedSku
   );
 
-  // Giả lập lưu phiếu nhập kho mất 1s
+  // XỬ LÝ LẬP PHIẾU NHẬP KHO (Giả lập độ trễ mạng 1 giây)
   const onSubmit = (data: InboundFormValues) => {
     setIsSubmitting(true);
+
     setTimeout(() => {
-      const targetProduct = availableProducts.find(
-        (p) => p.sku === data.productSku
-      );
-      if (!targetProduct) return;
-
-      const numQtyToAdd = Number(data.qtyToAdd);
-      const newTicket = {
-        id: `IP-2026-00${inboundTickets.length + 1}`,
-        sku: data.productSku,
-        name: targetProduct.name,
-        qty: numQtyToAdd,
-        date: new Date().toISOString().replace("T", " ").substring(0, 16),
-        handler: "Trần Minh Đức",
+      // Gọi Action của Zustand để cập nhật kho và lưu phiếu nhập
+      addInboundTicket({
+        productSku: data.productSku,
+        qty: Number(data.qtyToAdd),
         note: data.note || "Không có ghi chú",
-      };
+      });
 
-      setAvailableProducts((prev) =>
-        prev.map((p) =>
-          p.sku === data.productSku
-            ? { ...p, currentQty: p.currentQty + numQtyToAdd }
-            : p
-        )
-      );
-      setInboundTickets([newTicket, ...inboundTickets]);
       setIsSubmitting(false);
       setIsOpen(false);
       reset();
@@ -123,6 +82,7 @@ export default function InboundPage() {
 
   return (
     <div className="space-y-6">
+      {/* HEADER & NÚT TẠO PHIẾU */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -141,10 +101,11 @@ export default function InboundPage() {
         </button>
       </div>
 
+      {/* HIỂN THỊ TRẠNG THÁI LOADING HOẶC BẢNG NHẬT KÝ */}
       {isLoading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
           <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-slate-500 font-medium animate-pulse">
             Đang tải nhật ký nhập kho...
           </p>
         </div>
@@ -157,6 +118,7 @@ export default function InboundPage() {
                   <th className="py-3 px-6">Mã Phiếu</th>
                   <th className="py-3 px-6">Sản phẩm</th>
                   <th className="py-3 px-6">Số lượng nhập</th>
+                  <th className="py-3 px-6">Ghi chú</th>
                   <th className="py-3 px-6">Thời gian</th>
                   <th className="py-3 px-6">Người thực hiện</th>
                 </tr>
@@ -175,11 +137,14 @@ export default function InboundPage() {
                         {ticket.name}
                       </div>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">
-                        {ticket.sku}
+                        {ticket.productSku}
                       </div>
                     </td>
                     <td className="py-4 px-6 font-bold text-blue-600">
                       +{ticket.qty} cái
+                    </td>
+                    <td className="py-4 px-6 text-slate-500 italic max-w-xs truncate">
+                      {ticket.note}
                     </td>
                     <td className="py-4 px-6 text-slate-500">{ticket.date}</td>
                     <td className="py-4 px-6 text-slate-700 font-medium">
@@ -193,13 +158,16 @@ export default function InboundPage() {
         </div>
       )}
 
+      {/* MODAL LẬP PHIẾU NHẬP KHO */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 relative animate-in fade-in zoom-in-95 duration-150">
             <h3 className="text-lg font-bold text-slate-900 mb-4">
               Lập phiếu nhập kho mới
             </h3>
+
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* DROPDOWN CHỌN SẢN PHẨM TỪ STORE TẬP TRUNG */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
                   Chọn sản phẩm
@@ -211,7 +179,7 @@ export default function InboundPage() {
                   <option value="">-- Chọn mặt hàng --</option>
                   {availableProducts.map((p) => (
                     <option key={p.sku} value={p.sku}>
-                      {p.name}
+                      {p.name} ({p.sku})
                     </option>
                   ))}
                 </select>
@@ -222,30 +190,32 @@ export default function InboundPage() {
                 )}
               </div>
 
+              {/* THÔNG TIN CHI TIẾT SẢN PHẨM KHI ĐƯỢC CHỌN */}
               {selectedProductInfo && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs animate-in fade-in duration-200">
                   <div className="flex justify-between text-slate-500">
-                    <span>Vị trí kho:</span>
+                    <span>Vị trí kho hiện tại:</span>
                     <span className="font-bold text-slate-700">
-                      {selectedProductInfo.location}
+                      📍 {selectedProductInfo.location}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-500">
                     <span>Số lượng tồn hiện tại:</span>
                     <span className="font-bold text-slate-700">
-                      {selectedProductInfo.currentQty} cái
+                      {selectedProductInfo.qty} cái
                     </span>
                   </div>
                 </div>
               )}
 
+              {/* SỐ LƯỢNG THỰC NHẬP */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
                   Số lượng thực nhập
                 </label>
                 <input
                   type="text"
-                  placeholder="0"
+                  placeholder="Nhập số lượng, ví dụ: 10"
                   {...register("qtyToAdd")}
                   className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800"
                 />
@@ -256,18 +226,20 @@ export default function InboundPage() {
                 )}
               </div>
 
+              {/* GHI CHÚ NHẬP KHO */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
                   Ghi chú
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Lý do nhập kho..."
+                  placeholder="Lý do nhập kho, thông tin đối tác bổ sung..."
                   {...register("note")}
                   className="w-full px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 resize-none"
                 />
               </div>
 
+              {/* NÚT ĐIỀU KHIỂN */}
               <div className="flex justify-end space-x-3 pt-2">
                 <button
                   type="button"
@@ -276,14 +248,14 @@ export default function InboundPage() {
                     setIsOpen(false);
                     reset();
                   }}
-                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg"
+                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center space-x-2 disabled:bg-blue-400"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center space-x-2 disabled:bg-blue-400"
                 >
                   {isSubmitting && (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
