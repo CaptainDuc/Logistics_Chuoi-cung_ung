@@ -65,6 +65,13 @@ export default function DashboardLayout({
             <span>📥</span>
             <span>Quản lý nhập kho</span>
           </Link>
+          <Link
+            href="/dashboard/outbound"
+            className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
+          >
+            <span>📤</span>
+            <span>Quản lý xuất kho</span>
+          </Link>
         </nav>
 
         {/* THÔNG TIN BẢN QUYỀN HOẶC PHIÊN BẢN */}
