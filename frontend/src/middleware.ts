@@ -27,7 +27,8 @@ export function middleware(request: NextRequest) {
 // Cấu hình các Route (Đường dẫn) mà Middleware này bắt buộc phải nhảy vào quét bảo mật
 export const config = {
   matcher: [
-    "/dashboard/:path*", // Quét trang dashboard và toàn bộ các trang con bên trong (products, inbound, outbound,...)
+    "/dashboard",
+    "/dashboard/:path*",
     "/login", // Quét trang login
   ],
 };
