@@ -37,8 +37,11 @@ interface WarehouseState {
   isLoading: boolean;
   initializeData: () => void;
   addProduct: (product: Omit<Product, "id">) => void;
-  updateProduct: (id: number, updatedProduct: Partial<Product>) => void; // Thêm dòng này
-  deleteProduct: (id: number) => void; // Thêm dòng này
+  updateProduct: (
+    id: number | string,
+    updatedProduct: Partial<Product>
+  ) => void;
+  deleteProduct: (id: number | string) => void;
   addInboundTicket: (
     ticket: Omit<InboundTicket, "id" | "date" | "handler" | "name">
   ) => void;
@@ -123,14 +126,14 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   updateProduct: (id, updatedProduct) =>
     set((state) => ({
       products: state.products.map((p) =>
-        p.id === id ? { ...p, ...updatedProduct } : p
+        p.id.toString() === id.toString() ? { ...p, ...updatedProduct } : p
       ),
     })),
 
   // Action: Xóa sản phẩm khỏi danh sách (Thêm mới)
   deleteProduct: (id) =>
     set((state) => ({
-      products: state.products.filter((p) => p.id !== id),
+      products: state.products.filter((p) => p.id.toString() !== id.toString()),
     })),
 
   // Action: Lập phiếu nhập kho bổ sung ➜ Tự động cộng dồn số lượng tồn 'qty'
