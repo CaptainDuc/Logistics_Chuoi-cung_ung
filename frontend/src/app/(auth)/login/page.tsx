@@ -23,41 +23,63 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue, // Dùng để cập nhật giá trị đã lọc sạch dấu cách vào React Hook Form
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
 
+  // HÀM BẢO BỐI: Loại bỏ khoảng trắng ngay lập tức và giữ nguyên vị trí con trỏ chuột
+  const handleInputChangeNoSpace = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldName: "username" | "password"
+  ) => {
+    const input = e.target;
+    const rawValue = input.value;
+
+    // 1. Lưu lại vị trí con trỏ hiện tại trước khi xử lý chuỗi
+    const startCursor = input.selectionStart || 0;
+
+    // 2. Nếu phát hiện có bất kỳ dấu cách/khoảng trắng nào (\s)
+    if (/\s/.test(rawValue)) {
+      // Loại bỏ toàn bộ khoảng trắng thừa
+      const cleanValue = rawValue.replace(/\s/g, "");
+
+      // Đồng bộ giá trị sạch vào React Hook Form
+      setValue(fieldName, cleanValue, { shouldValidate: true });
+
+      // 3. Đợi React cập nhật DOM ngầm, ép con trỏ đứng yên đúng vị trí cũ thay vì bay về cuối dòng
+      setTimeout(() => {
+        const newCursorPosition = startCursor - 1;
+        input.setSelectionRange(newCursorPosition, newCursorPosition);
+      }, 0);
+    } else {
+      // Nếu không có dấu cách, cập nhật giá trị bình thường
+      setValue(fieldName, rawValue, { shouldValidate: true });
+    }
+  };
+
   // LOGIC ĐĂNG NHẬP GIẢ LẬP KHI CHƯA CÓ BACKEND
   const onSubmit = async (data: LoginFormValues) => {
-    setLoginError(null); // Xóa thông báo lỗi cũ nếu có trước khi bấm login lại
+    setLoginError(null);
 
     try {
-      // Giả lập hiệu ứng chờ phản hồi từ server trong 1.5 giây
       await new Promise((resolve) => setTimeout(resolve, 1500));
       console.log("Dữ liệu đăng nhập giả lập:", data);
 
-      // CẤU HÌNH TÀI KHOẢN GIẢ LẬP ĐỂ ĐỨC VÀ NHÓM TEST LUỒNG
       if (data.username === "admin" && data.password === "123456") {
-        // 1. Tạo chuỗi token giả định cho hệ thống quản lý chuỗi cung ứng
         const fakeToken = "mock_token_logistics_2026_captain_duc";
-
-        // 2. LƯU TOKEN VÀO COOKIE TRÌNH DUYỆT
-        // Thời gian sống: 1 ngày (86400 giây). Path=/ áp dụng cho toàn bộ domain.
         document.cookie = `auth_token=${fakeToken}; path=/; max-age=86400; SameSite=Strict`;
 
-        // 3. Đăng nhập thành công, mở cửa đẩy vào Dashboard
         router.push("/dashboard");
-        router.refresh(); // Buộc router quét lại cookie để middleware.ts nhận diện ngay lập tức
+        router.refresh();
       } else {
-        // Gõ sai tài khoản mặc định thì ném lỗi ra khối catch để xử lý
         throw new Error(
           "Tài khoản hoặc mật khẩu không chính xác! (Gợi ý tài khoản test: admin / 123456)"
         );
       }
     } catch (error: any) {
       console.error("Lỗi đăng nhập phát sinh:", error);
-      // Hiển thị thông báo lỗi thân thiện lên giao diện thay vì báo lỗi kết nối mạng
       setLoginError(error.message);
     }
   };
@@ -72,26 +94,27 @@ export default function LoginPage() {
       {/* LỚP PHỦ TỐI */}
       <div className="absolute inset-0 bg-black/20 z-0"></div>
 
-      {/* .wrapper: Khung form Glassmorphism */}
+      {/* Khung form Glassmorphism */}
       <div className="relative z-10 w-[420px] bg-transparent border-2 border-white/20 backdrop-blur-[15px] shadow-[0_0_10px_rgba(0,0,0,0.2)] text-white rounded-[16px] py-8 px-10 mx-4">
         <form onSubmit={handleSubmit(onSubmit)}>
           <h1 className="text-3xl text-center font-bold font-['Poppins'] tracking-tight">
             Login
           </h1>
 
-          {/* HIỂN THỊ LỖI ĐĂNG NHẬP (Báo sai mật khẩu hoặc lỗi hệ thống) */}
+          {/* HIỂN THỊ LỖI ĐĂNG NHẬP */}
           {loginError && (
             <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-center text-sm text-rose-200 font-medium">
               {loginError}
             </div>
           )}
 
-          {/* .input-box (Username) */}
+          {/* Input Box (Username) */}
           <div className="relative w-full h-[50px] mt-6 mb-2">
             <input
               type="text"
               placeholder="Username"
-              {...register("username")}
+              {...register("username")} // Giữ nguyên đăng ký để validation hoạt động
+              onChange={(e) => handleInputChangeNoSpace(e, "username")} // Đè hàm onChange tùy biến lên trên
               className="w-full h-full bg-transparent border-2 border-white/20 rounded-[40px] text-base text-white py-5 pl-5 pr-11 placeholder:text-white/60 outline-none focus:border-white/60 transition-all"
             />
             <User className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white" />
@@ -102,15 +125,15 @@ export default function LoginPage() {
             </p>
           )}
 
-          {/* .input-box (Password) */}
+          {/* Input Box (Password) */}
           <div className="relative w-full h-[50px] mt-6 mb-2">
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              {...register("password")}
+              {...register("password")} // Giữ nguyên đăng ký để validation hoạt động
+              onChange={(e) => handleInputChangeNoSpace(e, "password")} // Đè hàm onChange tùy biến lên trên
               className="w-full h-full bg-transparent border-2 border-white/20 rounded-[40px] text-base text-white py-5 pl-5 pr-11 placeholder:text-white/60 outline-none focus:border-white/60 transition-all"
             />
-            {/* Nút bật/tắt hiển thị mật khẩu lồng vào vị trí của icon khóa */}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -129,7 +152,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          {/* .remember-forgot */}
+          {/* Remember Me & Forgot Password */}
           <div className="flex justify-between text-sm mt-2 mx-0 mb-[15px] pt-2 px-1">
             <label className="flex items-center cursor-pointer select-none">
               <input
@@ -143,7 +166,7 @@ export default function LoginPage() {
             </a>
           </div>
 
-          {/* .btn */}
+          {/* Nút bấm Đăng Nhập */}
           <button
             type="submit"
             disabled={isSubmitting}
@@ -155,7 +178,7 @@ export default function LoginPage() {
             <span>{isSubmitting ? "Processing..." : "Login"}</span>
           </button>
 
-          {/* .register-link */}
+          {/* Link Đăng Ký */}
           <div className="text-sm text-center mt-5 mx-0 mb-0">
             <p>
               Don't have an account?{" "}
