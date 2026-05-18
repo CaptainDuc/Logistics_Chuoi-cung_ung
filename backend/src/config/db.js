@@ -19,17 +19,17 @@ async function ketNoiMongoDB() {
 
     const tenDatabase = mongoose.connection.name;
     console.log(
-      `[DB] ✅ Kết nối MongoDB thành công! Database: "${tenDatabase}"`,
+      `[DB]  Kết nối MongoDB thành công! Database: "${tenDatabase}"`,
     );
   } catch (err) {
-    console.error("[DB] ❌ Kết nối MongoDB THẤT BẠI!");
+    console.error("[DB]  Kết nối MongoDB THẤT BẠI!");
     console.error(`[DB] Lỗi chi tiết: ${err.message}`);
     throw new Error(`Không thể kết nối MongoDB: ${err.message}`);
   }
 }
 
 mongoose.connection.on("disconnected", () => {
-  console.warn("[DB] ⚠️  Mongoose đã bị NGẮT KẾT NỐI khỏi MongoDB.");
+  console.warn("[DB]  Mongoose đã bị NGẮT KẾT NỐI khỏi MongoDB.");
 });
 
 module.exports = {
