@@ -6,64 +6,66 @@ import { Download } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
-// Hàm giả định để lấy thông tin handler (Người thực hiện)
 const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
 
 export default function DashboardPage() {
-  // Gọi các dữ liệu từ Zustand store đã xử lý xong id (string | number)
+  // 🔥 ĐỒNG BỘ: Gọi thêm transactions và fetchTransactions trực tiếp từ Store thật
   const {
     products,
-    inboundTickets,
-    outboundTickets,
+    transactions,
+    fetchProducts,
+    fetchTransactions,
     isLoading,
-    initializeData,
   } = useWarehouseStore();
-
   const { adminName } = useAdminStore();
 
   useEffect(() => {
-    initializeData();
-  }, [initializeData]);
+    fetchProducts();
+    fetchTransactions(); // 🔥 Tự động nạp dữ liệu giao dịch khi load trang
+  }, [fetchProducts, fetchTransactions]);
 
-  // --- LOGIC TÍNH TOÁN SỐ LIỆU THỐNG KÊ ---
+  // --- LOGIC TÍNH TOÁN SỐ LIỆU THỐNG KÊ THỰC TẾ ---
   const totalProductTypes = products.length;
   const totalItemsInStock = products.reduce(
-    (sum, p) => sum + (Number(p.qty) || 0),
+    (sum, p) => sum + (Number(p.quantity) || 0),
     0
   );
+
+  // Phân loại đếm số lượng phiếu dựa trên trường type từ MongoDB ('INBOUND' hoặc 'OUTBOUND')
+  const inboundTickets = transactions.filter((t) => t.type === "INBOUND");
+  const outboundTickets = transactions.filter((t) => t.type === "OUTBOUND");
+
   const totalInboundTransactions = inboundTickets.length;
   const totalOutboundTransactions = outboundTickets.length;
-  const lowStockProducts = products.filter((p) => (Number(p.qty) || 0) < 15);
 
-  const recentActivities = [
-    ...inboundTickets.map((t) => ({
-      ...t,
-      type: "INBOUND",
-      badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
-    })),
-    ...outboundTickets.map((t) => ({
-      ...t,
-      type: "OUTBOUND",
-      badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
-    })),
-  ]
-    .sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA;
-    })
-    .slice(0, 5);
+  const lowStockProducts = products.filter(
+    (p) => (Number(p.quantity) || 0) < 15
+  );
 
-  // --- HÀM XUẤT PHIẾU KHO HÀNG: ẨN GRIDLINES - ĐÚNG TIÊU ĐỀ YÊU CẦU ---
-  const exportToWarehouseExcel = async (dataListInput: any[]) => {
+  // Chuẩn hóa danh sách hiển thị nhật ký (Lấy tối đa 5 giao dịch mới nhất)
+  const recentActivities = transactions.slice(0, 5).map((act) => ({
+    id: act._id || act.id,
+    name: act.name || `Giao dịch sản phẩm ${act.productId?.name || "ẩn"}`,
+    qty: act.quantity || act.qty || 0,
+    type: act.type, // INBOUND hoặc OUTBOUND
+    date: act.createdAt
+      ? new Date(act.createdAt).toLocaleDateString("vi-VN")
+      : "Vừa xong",
+    badgeColor:
+      act.type === "INBOUND"
+        ? "bg-blue-50 text-blue-700 border-blue-200"
+        : "bg-rose-50 text-rose-700 border-rose-200",
+  }));
+
+  // --- HÀM XUẤT PHIẾU KHO HÀNG ---
+  const exportToWarehouseExcel = async (
+    dataListInput: any[],
+    titleFile: string = "Phieu_Kho_Hang"
+  ) => {
     const workbook = new ExcelJS.Workbook();
-    // Đổi tên Sheet thành Phieu_Kho_Hang
     const worksheet = workbook.addWorksheet("Phieu_Kho_Hang");
-
-    // Ẩn toàn bộ sọc lưới sọc dọc ngang mặc định xung quanh bảng Excel
     worksheet.views = [{ showGridLines: false }];
 
-    // Cấu hình độ rộng cột chống lỗi tràn ô kỹ thuật (####)
     worksheet.columns = [
       { key: "stt", width: 7 },
       { key: "name", width: 42 },
@@ -89,7 +91,6 @@ export default function DashboardPage() {
       right: borderThinSide,
     };
 
-    // 1. Khối thông tin hành chính
     worksheet.getCell("A1").value = "Đơn vị: .........................";
     worksheet.getCell("A1").font = fontMain;
     worksheet.getCell("H1").value = "Mẫu số: 02 - VT";
@@ -106,8 +107,7 @@ export default function DashboardPage() {
     worksheet.getCell("H3").font = fontItalic;
     worksheet.getCell("H3").alignment = { horizontal: "right" };
 
-    // 2. Tiêu đề trung tâm đã sửa thành: PHIẾU KHO HÀNG
-    worksheet.getCell("D5").value = "PHIẾU KHO HÀNG";
+    worksheet.getCell("D5").value = titleFile.toUpperCase().replace(/_/g, " ");
     worksheet.getCell("D5").font = {
       name: "Times New Roman",
       size: 16,
@@ -126,21 +126,6 @@ export default function DashboardPage() {
     worksheet.getCell("D7").font = fontMain;
     worksheet.getCell("D7").alignment = { horizontal: "center" };
 
-    // 3. Thông tin người vận hành lệnh bãi kho
-    worksheet.getCell(
-      "A9"
-    ).value = `– Họ và tên người nhận hàng: ....................................................................................................`;
-    worksheet.getCell("A9").font = fontMain;
-    worksheet.getCell(
-      "A10"
-    ).value = `– Lý do xuất kho hàng: .................................................................................................................................`;
-    worksheet.getCell("A10").font = fontMain;
-    worksheet.getCell(
-      "A11"
-    ).value = `– Xuất tại kho (ngăn lô): ............................................................. Địa điểm: ..........................................`;
-    worksheet.getCell("A11").font = fontMain;
-
-    // 4. Tiêu đề cấu trúc bảng (Hàng 13 & 14)
     worksheet.mergeCells("A13:A14");
     worksheet.getCell("A13").value = "STT";
     worksheet.mergeCells("B13:B14");
@@ -172,37 +157,23 @@ export default function DashboardPage() {
       }
     }
 
-    const subHeaders = ["A", "B", "C", "D", "1", "2", "3", "4"];
-    subHeaders.forEach((val, idx) => {
-      const cell = worksheet.getCell(15, idx + 1);
-      cell.value = val;
-      cell.font = fontItalic;
-      cell.alignment = { horizontal: "center" };
-      cell.border = borderThin;
-    });
-
-    // 5. Vòng lặp đổ dữ liệu vật tư thực tế
     let currentRow = 16;
     let totalQtyReq = 0;
-    let totalQtyAct = 0;
     let totalAmount = 0;
 
-    const dataList = dataListInput.length > 0 ? dataListInput : products;
-
-    dataList.forEach((item, index) => {
-      const qty = Number(item.qty) || 0;
+    dataListInput.forEach((item, index) => {
+      const qty = Number(item.quantity || item.qty) || 0;
       const price = Number(item.price) || 150000;
       const amount = qty * price;
 
       totalQtyReq += qty;
-      totalQtyAct += qty;
       totalAmount += amount;
 
       worksheet.getCell(`A${currentRow}`).value = index + 1;
       worksheet.getCell(`B${currentRow}`).value =
-        item.name || "Sản phẩm chưa rõ tên";
+        item.name || item.productId?.name || "Sản phẩm";
       worksheet.getCell(`C${currentRow}`).value =
-        (item.sku || item.productSku || item.id || "").toString() || "—";
+        item.sku || item.productId?.sku || "—";
       worksheet.getCell(`D${currentRow}`).value = item.unit || "Cái";
       worksheet.getCell(`E${currentRow}`).value = qty;
       worksheet.getCell(`F${currentRow}`).value = qty;
@@ -225,71 +196,11 @@ export default function DashboardPage() {
       currentRow++;
     });
 
-    // 6. Dòng tổng kết bảng
-    worksheet.getCell(`B${currentRow}`).value = "Cộng";
-    worksheet.getCell(`C${currentRow}`).value = "x";
-    worksheet.getCell(`D${currentRow}`).value = "x";
-    worksheet.getCell(`E${currentRow}`).value = totalQtyReq;
-    worksheet.getCell(`F${currentRow}`).value = totalQtyAct;
-    worksheet.getCell(`G${currentRow}`).value = "x";
-    worksheet.getCell(`H${currentRow}`).value = totalAmount;
-
-    for (let c = 1; c <= 8; c++) {
-      const cell = worksheet.getCell(currentRow, c);
-      cell.font = fontBold;
-      cell.border = borderThin;
-      if (c === 2 || c === 3 || c === 4 || c === 7)
-        cell.alignment = { horizontal: "center" };
-      if (c === 5 || c === 6 || c === 8) {
-        cell.alignment = { horizontal: "right" };
-        if (c === 8) cell.numFmt = "#,##0";
-      }
-    }
-
-    // 7. Ghi chú và khối chữ ký cuối văn bản (Không có khung viền ô)
-    currentRow += 2;
-    worksheet.getCell(`A${currentRow}`).value =
-      "– Tổng số tiền (viết bằng chữ): ......................................................................................................................................";
-    worksheet.getCell(`A${currentRow}`).font = fontItalic;
-
-    currentRow++;
-    worksheet.getCell(`A${currentRow}`).value =
-      "– Số chứng từ gốc kèm theo: ........................................................................................................................................";
-    worksheet.getCell(`A${currentRow}`).font = fontMain;
-
-    currentRow += 3;
-    worksheet.getCell(`G${currentRow}`).value =
-      "Ngày ..... tháng ..... năm ......";
-    worksheet.getCell(`G${currentRow}`).font = fontItalic;
-    worksheet.getCell(`G${currentRow}`).alignment = { horizontal: "center" };
-
-    currentRow++;
-    const roles = [
-      { title: "Người lập phiếu", sub: "(Ký, họ tên)", col: 1 },
-      { title: "Người nhận hàng", sub: "(Ký, họ tên)", col: 2 },
-      { title: "Thủ kho", sub: "(Ký, họ tên)", col: 4 },
-      { title: "Kế toán trưởng", sub: "(Ký, họ tên)", col: 6 },
-      { title: "Giám đốc", sub: "(Ký, họ tên)", col: 8 },
-    ];
-
-    roles.forEach((role) => {
-      const titleCell = worksheet.getCell(currentRow, role.col);
-      titleCell.value = role.title;
-      titleCell.font = fontBold;
-      titleCell.alignment = { horizontal: "center" };
-
-      const subCell = worksheet.getCell(currentRow + 1, role.col);
-      subCell.value = role.sub;
-      subCell.font = fontItalic;
-      subCell.alignment = { horizontal: "center" };
-    });
-
-    // Xuất buffer và đặt tên file tải về chuẩn chỉnh: Phieu_Kho_Hang_yyyy-mm-dd.xlsx
     const buffer = await workbook.xlsx.writeBuffer();
     const fileBlob = new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-    saveAs(fileBlob, `Phieu_Kho_Hang_${today.toISOString().slice(0, 10)}.xlsx`);
+    saveAs(fileBlob, `${titleFile}_${today.toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (isLoading) {
@@ -305,7 +216,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* KHỐI TIÊU ĐỀ DASHBOARD VÀ CÁC NÚT TẢI CHỨNG TỪ */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -318,32 +228,32 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {/* Nút bấm giao diện đã được đổi tên thành Xuất phiếu kho hàng */}
           <button
-            onClick={() => exportToWarehouseExcel(products)}
+            onClick={() => exportToWarehouseExcel(products, "Phieu_Kho_Hang")}
             className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" /> Xuất phiếu kho
-            hàng
+            Xuất phiếu tổng kho
           </button>
           <button
-            onClick={() => exportToWarehouseExcel(inboundTickets)}
+            onClick={() =>
+              exportToWarehouseExcel(inboundTickets, "Phieu_Nhap_Kho")
+            }
             className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
-            <Download className="w-3.5 h-3.5 text-blue-600" /> Xuất phiếu nhập
-            kho
+            Xuất phiếu nhập kho
           </button>
           <button
-            onClick={() => exportToWarehouseExcel(outboundTickets)}
+            onClick={() =>
+              exportToWarehouseExcel(outboundTickets, "Phieu_Xuat_Kho")
+            }
             className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
-            <Download className="w-3.5 h-3.5 text-rose-600" /> Xuất phiếu xuất
-            kho
+            Xuất phiếu xuất kho
           </button>
         </div>
       </div>
 
-      {/* THẺ THỐNG KÊ TRÊN DASHBOARD */}
+      {/* --- THẺ THỐNG KÊ SỐ LIỆU --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
@@ -394,7 +304,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* BẢNG CẢNH BÁO VÀ NHẬT KÝ */}
+      {/* --- PANEL CHI TIẾT --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col h-[400px]">
           <div className="mb-4">
@@ -413,19 +323,17 @@ export default function DashboardPage() {
             ) : (
               lowStockProducts.map((p) => (
                 <div
-                  key={p.id}
+                  key={p._id}
                   className="p-3 bg-rose-50/40 rounded-xl border border-rose-100 flex justify-between items-center"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
                       {p.name}
                     </p>
-                    <p className="text-xs text-slate-400 font-mono">
-                      {p.sku || p.id}
-                    </p>
+                    <p className="text-xs text-slate-400 font-mono">{p.sku}</p>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-700">
-                    Còn {p.qty} cái
+                    Còn {p.quantity} cái
                   </span>
                 </div>
               ))
@@ -433,48 +341,59 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* 🔥 NHẬT KÝ HOẠT ĐỘNG REAL-TIME TỪ MONGODB */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 flex flex-col h-[400px]">
           <div className="mb-4">
             <h3 className="text-base font-bold text-slate-900">
               ⏱️ Nhật ký hoạt động gần đây
             </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Đồng bộ trực tiếp từ các phiếu giao dịch bãi kho.
+            </p>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3">
-            {recentActivities.map((act) => (
-              <div
-                key={act.id}
-                className="p-3 bg-slate-50/50 rounded-xl border border-slate-200 flex justify-between items-center"
-              >
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={`text-[10px] font-extrabold uppercase px-2 py-1 rounded border ${act.badgeColor}`}
-                  >
-                    {act.type === "INBOUND" ? "Nhập" : "Xuất"}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {act.name || "Chứng từ bãi kho"}
+            {recentActivities.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-12">
+                Chưa có hoạt động nhập xuất kho nào được thực hiện.
+              </p>
+            ) : (
+              recentActivities.map((act) => (
+                <div
+                  key={act.id}
+                  className="p-3 bg-slate-50/50 rounded-xl border border-slate-200 flex justify-between items-center"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2 py-1 rounded border ${act.badgeColor}`}
+                    >
+                      {act.type === "INBOUND" ? "Nhập" : "Xuất"}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {act.name}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Mã phiếu: {act.id} • Thủ kho: {adminName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`text-sm font-bold ${
+                        act.type === "INBOUND"
+                          ? "text-blue-600"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {act.type === "INBOUND" ? "+" : "-"} {act.qty} cái
                     </p>
-                    <p className="text-xs text-slate-400">
-                      Mã phiếu: {act.id} • Người thực hiện: {adminName}
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {act.date}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p
-                    className={`text-sm font-bold ${
-                      act.type === "INBOUND" ? "text-blue-600" : "text-rose-600"
-                    }`}
-                  >
-                    {act.type === "INBOUND" ? "+" : "-"}
-                    {act.qty || 0} cái
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {act.date || "Vừa xong"}
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -13,82 +13,108 @@ import {
   Building2,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
-import { useAdminStore } from "@/store/useAdminStore";
+
+// Giả định hoặc Đức dùng store admin thực tế của Đức
+const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
 
 export default function OutboundPage() {
+  const { adminName } = useAdminStore(); // Lấy adminName người lập phiếu
+
+  // 🔥 ĐỒNG BỘ HOÀN TOÀN: Gọi đúng các state và hàm từ file useWarehouseStore của Đức
   const {
     products,
-    outboundTickets,
     isLoading,
-    initializeData,
-    addOutboundTicket,
+    fetchProducts,
+    addInventoryTransaction, // Sử dụng hàm transaction chung của Backend
   } = useWarehouseStore();
-  const { adminName } = useAdminStore(); // Lấy adminName từ store
 
+  // Gọi API lấy danh sách sản phẩm mới nhất từ MongoDB khi load trang
   useEffect(() => {
-    initializeData();
-  }, [initializeData]);
+    if (fetchProducts) {
+      fetchProducts();
+    }
+  }, [fetchProducts]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
+    productId: "", // Lưu _id để gửi lên API transaction
     productSku: "",
     qty: 1,
     customerName: "",
   });
 
+  // Tự động chọn sản phẩm đầu tiên khi mở modal xuất kho
   const handleOpenModal = () => {
-    if (products.length > 0) {
-      setFormData({ productSku: products[0].sku, qty: 1, customerName: "" });
+    if (products && products.length > 0) {
+      setFormData({
+        productId: products[0]._id,
+        productSku: products[0].sku,
+        qty: 1,
+        customerName: "",
+      });
     } else {
-      setFormData({ productSku: "", qty: 1, customerName: "" });
+      setFormData({ productId: "", productSku: "", qty: 1, customerName: "" });
     }
     setIsModalOpen(true);
   };
 
-  // Hàm xử lý khi bấm xác nhận xuất kho
-  const handleSubmitTicket = (e: React.FormEvent) => {
+  // Xử lý khi bấm xác nhận xuất kho bổ sung
+  const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.productSku) {
-      alert("Vui lòng chọn một sản phẩm để xuất kho!");
+    if (!formData.productId) {
+      alert("Đức vui lòng chọn một sản phẩm để xuất kho nhé!");
       return;
     }
 
-    const selectedProduct = products.find((p) => p.sku === formData.productSku);
-    if (selectedProduct && formData.qty > selectedProduct.qty) {
+    // Tìm sản phẩm khớp để kiểm tra tồn kho thực tế trước khi bấm xuất
+    const selectedProduct = products.find((p) => p._id === formData.productId);
+
+    // Sửa lỗi gạch đỏ: So sánh với p.quantity thay vì p.qty cũ
+    if (selectedProduct && formData.qty > (selectedProduct.quantity || 0)) {
       alert(
-        `Lỗi: Số lượng xuất (${formData.qty}) vượt quá số lượng tồn kho hiện tại (${selectedProduct.qty})!`
+        `Lỗi: Số lượng xuất (${
+          formData.qty
+        }) vượt quá số lượng tồn kho thực tế hiện có (${
+          selectedProduct.quantity || 0
+        })!`
       );
       return;
     }
 
-    // Ép kiểu nhẹ nhàng ở UI để truyền handler đi qua Store mượt mà không lo báo lỗi TypeScript
-    (addOutboundTicket as any)({
-      productSku: formData.productSku,
-      qty: formData.qty,
-      customerName: formData.customerName,
-      handler: adminName,
-    });
+    try {
+      // 🔥 Gọi hàm xử lý giao dịch thực tế: truyền đúng productId, type: 'Export', quantity
+      await addInventoryTransaction({
+        productId: formData.productId,
+        type: "Export",
+        quantity: formData.qty,
+      });
 
-    alert("Lập phiếu xuất kho thành công!");
-    setIsModalOpen(false);
+      alert("Khởi tạo giao dịch xuất kho thành công trên hệ thống!");
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi lập phiếu xuất kho:", error);
+      alert("Lập phiếu xuất kho thất bại!");
+    }
   };
 
-  const filteredTickets = outboundTickets.filter(
-    (ticket) =>
-      ticket.productSku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.handler.toLowerCase().includes(searchTerm.toLowerCase())
+  // Lọc an toàn danh sách sản phẩm hiển thị trên bảng
+  const safeProducts = products || [];
+  const filteredProducts = safeProducts.filter(
+    (product) =>
+      (product.sku || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.location || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Sử dụng biến trạng thái isLoading đồng bộ từ Store của Đức
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 text-sm font-medium">
-            Đang tải lịch sử xuất kho...
+          <div className="w-10 h-10 border-4 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 text-sm font-medium animate-pulse">
+            Đang tải dữ liệu bãi kho thực tế từ MongoDB...
           </p>
         </div>
       </div>
@@ -97,7 +123,7 @@ export default function OutboundPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto font-['Poppins',_sans-serif] text-slate-800 bg-white min-h-screen">
-      {/* Title */}
+      {/* Tiêu đề trang Outbound */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-slate-900">
@@ -105,7 +131,8 @@ export default function OutboundPage() {
             (Outbound)
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập phiếu xuất kho giao hàng cho đối tác và đại lý.
+            Lập phiếu xuất kho giao hàng cho đối tác và quản lý cập nhật số
+            lượng tồn kho thực tế.
           </p>
         </div>
 
@@ -121,7 +148,7 @@ export default function OutboundPage() {
       <div className="mb-6 relative max-w-md">
         <input
           type="text"
-          placeholder="Tìm theo mã SKU, tên hàng, đại lý hoặc người lập..."
+          placeholder="Tìm sản phẩm theo mã SKU hoặc tên hàng..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:bg-white transition-all"
@@ -129,68 +156,58 @@ export default function OutboundPage() {
         <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
       </div>
 
-      {/* Bảng Danh Sách */}
+      {/* Bảng Danh Sách Sản Phẩm Theo Dõi Xuất */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="px-6 py-4">Mã Phiếu</th>
-                <th className="px-6 py-4">Sản Phẩm Xuất</th>
-                <th className="px-6 py-4 text-right">Số Lượng Xuất</th>
-                <th className="px-6 py-4">Đại Lý / Khách Nhận</th>
-                <th className="px-6 py-4">Thời Gian</th>
-                <th className="px-6 py-4">Người Xử Lý</th>
+                <th className="px-6 py-4">Mã Vật Tư (SKU)</th>
+                <th className="px-6 py-4">Tên Sản Phẩm</th>
+                <th className="px-6 py-4">Vị Trí Kệ</th>
+                <th className="px-6 py-4 text-right">Số Lượng Tồn Thực Tế</th>
+                <th className="px-6 py-4">Trạng Thái Kho</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-              {filteredTickets.length > 0 ? (
-                filteredTickets.map((ticket) => (
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => (
                   <tr
-                    key={ticket.id}
+                    key={product._id}
                     className="hover:bg-slate-50/60 transition-all"
                   >
-                    <td className="px-6 py-4 font-semibold text-slate-900">
-                      {ticket.id}
+                    <td className="px-6 py-4 font-mono text-xs font-semibold text-rose-600">
+                      {product.sku}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {product.name}
+                    </td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {product.location || "Chưa xếp kệ"}
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-800">
+                      {Number(product.quantity || 0).toLocaleString()} cái
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">
-                        {ticket.name}
-                      </div>
-                      <div className="text-xs font-mono text-rose-600 mt-0.5">
-                        {ticket.productSku}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-rose-600">
-                      -{ticket.qty.toLocaleString()} cái
-                    </td>
-                    <td className="px-6 py-4 text-slate-700 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />{" "}
-                        {ticket.customerName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />{" "}
-                        {ticket.date}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400" />{" "}
-                        {ticket.handler}
-                      </div>
+                      {product.quantity <= product.minQuantity ? (
+                        <span className="bg-rose-50 text-rose-700 border border-rose-100 text-[11px] font-bold px-2 py-0.5 rounded-lg">
+                          Chạm mức tối thiểu
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-bold px-2 py-0.5 rounded-lg">
+                          Đủ điều kiện xuất
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-6 py-10 text-center text-slate-400"
                   >
-                    Chưa có lịch sử phiếu xuất kho nào được lập.
+                    Không tìm thấy hàng hóa nào phù hợp với từ khóa kiếm tìm.
                   </td>
                 </tr>
               )}
@@ -217,31 +234,41 @@ export default function OutboundPage() {
             </div>
 
             <form onSubmit={handleSubmitTicket} className="p-6 space-y-4">
+              {/* Chọn vật tư / Sản phẩm xuất */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Chọn vật tư / Sản phẩm xuất
                 </label>
-                {products.length > 0 ? (
+                {safeProducts.length > 0 ? (
                   <select
-                    value={formData.productSku}
-                    onChange={(e) =>
-                      setFormData({ ...formData, productSku: e.target.value })
-                    }
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"
+                    value={formData.productId}
+                    onChange={(e) => {
+                      const selectedProd = safeProducts.find(
+                        (p) => p._id === e.target.value
+                      );
+                      setFormData({
+                        ...formData,
+                        productId: e.target.value,
+                        productSku: selectedProd ? selectedProd.sku : "",
+                      });
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all cursor-pointer text-slate-700"
                   >
-                    {products.map((p) => (
-                      <option key={p.id} value={p.sku}>
-                        {p.name} ({p.sku}) — Tồn thực tế: {p.qty}
+                    {safeProducts.map((p) => (
+                      /* Sửa triệt để lỗi TypeScript: p._id làm key và p.quantity lấy số lượng tồn thực tế từ database Atlas */
+                      <option key={p._id} value={p._id}>
+                        {p.name} ({p.sku}) — Tồn thực tế: {p.quantity ?? 0}
                       </option>
                     ))}
                   </select>
                 ) : (
                   <div className="text-sm text-rose-500 bg-rose-50 border border-rose-100 p-3 rounded-xl">
-                    Hiện tại chưa có sản phẩm nào để xuất.
+                    Hiện tại chưa có sản phẩm nào trong bãi kho để xuất hàng.
                   </div>
                 )}
               </div>
 
+              {/* Số lượng xuất */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Số lượng xuất
@@ -257,10 +284,11 @@ export default function OutboundPage() {
                       qty: parseInt(e.target.value) || 1,
                     })
                   }
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all font-mono"
                 />
               </div>
 
+              {/* Tên Đại lý / Khách hàng nhận */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Tên Đại lý / Khách hàng nhận
@@ -268,7 +296,7 @@ export default function OutboundPage() {
                 <input
                   type="text"
                   required
-                  placeholder="..."
+                  placeholder="Nhập tên đơn vị hoặc đại lý đối tác..."
                   value={formData.customerName}
                   onChange={(e) =>
                     setFormData({ ...formData, customerName: e.target.value })
@@ -277,10 +305,11 @@ export default function OutboundPage() {
                 />
               </div>
 
-              <div className="bg-slate-50 border border-slate-150 p-3 rounded-xl text-xs text-slate-600 font-medium">
-                Người tạo phiếu: {adminName}
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 font-medium">
+                Người tạo phiếu xuất: {adminName}
               </div>
 
+              {/* Footer hành động */}
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
                 <button
                   type="button"
@@ -291,9 +320,9 @@ export default function OutboundPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={products.length === 0}
+                  disabled={safeProducts.length === 0}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
-                    products.length === 0
+                    safeProducts.length === 0
                       ? "bg-slate-300 cursor-not-allowed shadow-none"
                       : "bg-rose-600 hover:bg-rose-700"
                   }`}

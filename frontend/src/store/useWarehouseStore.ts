@@ -1,188 +1,120 @@
 import { create } from "zustand";
+import axios from "axios";
 
-// 1. Định nghĩa kiểu dữ liệu chuẩn chỉnh cho từng thực thể
 export interface Product {
-  id: number;
+  _id: string;
+  name: string;
   sku: string;
-  name: string;
+  quantity: number;
+  minQuantity: number;
   location: string;
-  qty: number;
+  supplierId?: { _id: string; name: string } | null;
+  trangThaiTonKho?: string;
 }
 
-export interface InboundTicket {
-  id: string;
-  productSku: string;
-  name: string;
-  qty: number;
-  date: string;
-  handler: string;
-  note: string;
-}
-
-export interface OutboundTicket {
-  id: string;
-  productSku: string;
-  name: string;
-  qty: number;
-  date: string;
-  handler: string;
-  customerName: string; // Đồng bộ trường này xuyên suốt hệ thống
-}
-
-// 2. Cấu trúc State và Action của Warehouse Store
+// 🔥 CẬP NHẬT INTERFACE: Quản lý cả sản phẩm và nhật ký giao dịch kho
 interface WarehouseState {
   products: Product[];
-  inboundTickets: InboundTicket[];
-  outboundTickets: OutboundTicket[];
+  transactions: any[]; // Lưu lịch sử phiếu nhập / xuất kho thật từ MongoDB
   isLoading: boolean;
-  initializeData: () => void;
-  addProduct: (product: Omit<Product, "id">) => void;
-  updateProduct: (
-    id: number | string,
-    updatedProduct: Partial<Product>
-  ) => void;
-  deleteProduct: (id: number | string) => void;
-  addInboundTicket: (
-    ticket: Omit<InboundTicket, "id" | "date" | "handler" | "name">
-  ) => void;
-  addOutboundTicket: (
-    ticket: Omit<OutboundTicket, "id" | "date" | "handler" | "name">
-  ) => void;
+  error: string | null;
+  fetchProducts: () => Promise<void>;
+  fetchTransactions: () => Promise<void>; // Hàm kéo lịch sử giao dịch về Dashboard
+  addProduct: (
+    productData: Omit<Product, "_id" | "trangThaiTonKho">
+  ) => Promise<void>;
+
+  addInventoryTransaction: (transaction: {
+    productId: string;
+    type: "INBOUND" | "OUTBOUND";
+    quantity: number;
+    name?: string;
+  }) => Promise<void>;
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   products: [],
-  inboundTickets: [],
-  outboundTickets: [],
-  isLoading: true,
+  transactions: [], // Khởi tạo mảng nhật ký trống sạch sẽ ban đầu
+  isLoading: false,
+  error: null,
 
-  // Khởi tạo dữ liệu ban đầu
-  initializeData: () => {
-    if (get().products.length > 0) return;
-
+  // 1. Hàm lấy danh sách sản phẩm từ Backend thật
+  fetchProducts: async () => {
     set({ isLoading: true });
-    setTimeout(() => {
+    try {
+      const response = await axios.get(`${API_URL}/products`);
+      // Backend trả về dạng { success: true, data: [...] } nên phải lấy response.data.data
+      if (response.data && response.data.success) {
+        set({ products: response.data.data, isLoading: false });
+      } else {
+        set({ products: [], isLoading: false });
+      }
+    } catch (error) {
+      console.error("Lỗi lấy sản phẩm từ MongoDB:", error);
+      set({ products: [], isLoading: false });
+    }
+  },
+
+  // 2. 🔥 BỔ SUNG: Hàm lấy danh sách toàn bộ Nhật ký giao dịch từ Backend thật
+  fetchTransactions: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/inventory/transactions`);
+      if (response.data && response.data.success) {
+        set({ transactions: response.data.data });
+      } else {
+        set({ transactions: [] });
+      }
+    } catch (error) {
+      console.error("Lỗi lấy nhật ký giao dịch từ MongoDB:", error);
+      set({ transactions: [] });
+    }
+  },
+
+  // 3. Hàm thêm mới một sản phẩm vào Database thật
+  addProduct: async (newProduct) => {
+    try {
+      const response = await axios.post(`${API_URL}/products`, newProduct);
+      const addedProduct = response.data.data;
+
+      set((state) => ({
+        products: [addedProduct, ...state.products],
+      }));
+    } catch (error) {
+      console.error("Lỗi khi tạo sản phẩm trong Store:", error);
+      throw error;
+    }
+  },
+
+  // 4. 🔥 CẬP NHẬT HÀM: Xử lý Nhập / Xuất kho real-time tự nhảy số liệu
+  addInventoryTransaction: async (transaction) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`${API_URL}/inventory/transaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(transaction),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        // Sau khi tạo phiếu thành công -> Gọi lại API kéo dữ liệu mới nhất
+        // của cả Sản phẩm và Giao dịch về để Dashboard tự nhảy số real-time!
+        await get().fetchProducts();
+        await get().fetchTransactions();
+      } else {
+        set({
+          error: result.message || "Giao dịch bãi kho thất bại!",
+          isLoading: false,
+        });
+      }
+    } catch (error: any) {
+      console.error("Lỗi khi gửi phiếu nhập/xuất kho:", error);
       set({
-        products: [
-          {
-            id: 1,
-            sku: "SKU-A1-1024",
-            name: "Tai nghe Sony WH-CH720N (Black)",
-            location: "Khu A - Kệ 1",
-            qty: 15,
-          },
-          {
-            id: 2,
-            sku: "SKU-B3-8842",
-            name: "iPhone 17 Pro Max 256GB",
-            location: "Khu B - Kệ 3",
-            qty: 45,
-          },
-          {
-            id: 3,
-            sku: "SKU-C2-4915",
-            name: "Hộp carton đóng gói size M",
-            location: "Khu C - Kệ 2",
-            qty: 12,
-          },
-        ],
-        inboundTickets: [
-          {
-            id: "IP-2026-001",
-            productSku: "SKU-B3-8842",
-            name: "iPhone 17 Pro Max 256GB",
-            qty: 20,
-            date: "2026-05-15 09:30",
-            handler: "Trần Minh Đức",
-            note: "Nhập hàng bổ sung đợt 1",
-          },
-        ],
-        outboundTickets: [
-          {
-            id: "OP-2026-001",
-            productSku: "SKU-C2-4915",
-            name: "Hộp carton đóng gói size M",
-            qty: 5,
-            date: "2026-05-17 10:15",
-            handler: "Trần Minh Đức",
-            customerName: "Cửa hàng Đại lý Quận 9",
-          },
-        ],
+        error: error.message || "Lỗi kết nối hệ thống!",
         isLoading: false,
       });
-    }, 1000);
-  },
-
-  // Action: Thêm mới sản phẩm gốc vào kho
-  addProduct: (newProd) =>
-    set((state) => ({
-      products: [
-        { id: state.products.length + 1, ...newProd },
-        ...state.products,
-      ],
-    })),
-
-  // Action: Cập nhật thông tin sản phẩm (Thêm mới)
-  updateProduct: (id, updatedProduct) =>
-    set((state) => ({
-      products: state.products.map((p) =>
-        p.id.toString() === id.toString() ? { ...p, ...updatedProduct } : p
-      ),
-    })),
-
-  // Action: Xóa sản phẩm khỏi danh sách (Thêm mới)
-  deleteProduct: (id) =>
-    set((state) => ({
-      products: state.products.filter((p) => p.id.toString() !== id.toString()),
-    })),
-
-  // Action: Lập phiếu nhập kho bổ sung ➜ Tự động cộng dồn số lượng tồn 'qty'
-  addInboundTicket: (ticket) => {
-    const newTicket = {
-      ...ticket,
-      id: `IN-${Date.now()}`,
-      date: new Date().toLocaleDateString("vi-VN"),
-    } as InboundTicket;
-
-    set((state) => {
-      // Tìm sản phẩm trong kho để cộng thêm số lượng
-      const updatedProducts = state.products.map((p) => {
-        if (p.sku === ticket.productSku) {
-          return { ...p, qty: p.qty + ticket.qty }; // Cộng thêm hàng vào kho
-        }
-        return p;
-      });
-
-      return {
-        inboundTickets: [newTicket, ...state.inboundTickets],
-        products: updatedProducts, // Cập nhật lại danh sách sản phẩm mới
-      };
-    });
-  },
-
-  // Action: Lập phiếu xuất kho ➜ Tự động trừ số lượng tồn 'qty'
-  addOutboundTicket: (ticket) => {
-    const newTicket = {
-      ...ticket,
-      id: `OUT-${Date.now()}`,
-      date: new Date().toLocaleDateString("vi-VN"),
-    } as OutboundTicket;
-
-    set((state) => {
-      // Tìm sản phẩm trong kho để trừ bớt số lượng
-      const updatedProducts = state.products.map((p) => {
-        if (p.sku === ticket.productSku) {
-          // Trừ bớt hàng, đảm bảo không giảm xuống dưới 0
-          const newQty = p.qty - ticket.qty;
-          return { ...p, qty: newQty < 0 ? 0 : newQty };
-        }
-        return p;
-      });
-
-      return {
-        outboundTickets: [newTicket, ...state.outboundTickets],
-        products: updatedProducts, // Cập nhật lại danh sách sản phẩm mới
-      };
-    });
+    }
   },
 }));
