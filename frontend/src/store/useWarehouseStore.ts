@@ -134,54 +134,52 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
     })),
 
   // Action: Lập phiếu nhập kho bổ sung ➜ Tự động cộng dồn số lượng tồn 'qty'
-  addInboundTicket: (ticket) =>
-    set((state) => {
-      const targetProduct = state.products.find(
-        (p) => p.sku === ticket.productSku
-      );
-      const updatedProducts = state.products.map((p) =>
-        p.sku === ticket.productSku ? { ...p, qty: p.qty + ticket.qty } : p
-      );
+  addInboundTicket: (ticket) => {
+    const newTicket = {
+      ...ticket,
+      id: `IN-${Date.now()}`,
+      date: new Date().toLocaleDateString("vi-VN"),
+    } as InboundTicket;
 
-      const newInbound: InboundTicket = {
-        id: `IP-2026-00${state.inboundTickets.length + 1}`,
-        productSku: ticket.productSku,
-        name: targetProduct ? targetProduct.name : "Sản phẩm không rõ",
-        qty: ticket.qty,
-        date: new Date().toISOString().replace("T", " ").substring(0, 16),
-        handler: "Trần Minh Đức",
-        note: ticket.note,
-      };
+    set((state) => {
+      // Tìm sản phẩm trong kho để cộng thêm số lượng
+      const updatedProducts = state.products.map((p) => {
+        if (p.sku === ticket.productSku) {
+          return { ...p, qty: p.qty + ticket.qty }; // Cộng thêm hàng vào kho
+        }
+        return p;
+      });
 
       return {
-        products: updatedProducts,
-        inboundTickets: [newInbound, ...state.inboundTickets],
+        inboundTickets: [newTicket, ...state.inboundTickets],
+        products: updatedProducts, // Cập nhật lại danh sách sản phẩm mới
       };
-    }),
+    });
+  },
 
   // Action: Lập phiếu xuất kho ➜ Tự động trừ số lượng tồn 'qty'
-  addOutboundTicket: (ticket) =>
-    set((state) => {
-      const targetProduct = state.products.find(
-        (p) => p.sku === ticket.productSku
-      );
-      const updatedProducts = state.products.map((p) =>
-        p.sku === ticket.productSku ? { ...p, qty: p.qty - ticket.qty } : p
-      );
+  addOutboundTicket: (ticket) => {
+    const newTicket = {
+      ...ticket,
+      id: `OUT-${Date.now()}`,
+      date: new Date().toLocaleDateString("vi-VN"),
+    } as OutboundTicket;
 
-      const newOutbound: OutboundTicket = {
-        id: `OP-2026-00${state.outboundTickets.length + 1}`,
-        productSku: ticket.productSku,
-        name: targetProduct ? targetProduct.name : "Sản phẩm không rõ",
-        qty: ticket.qty,
-        date: new Date().toISOString().replace("T", " ").substring(0, 16),
-        handler: "Trần Minh Đức",
-        customerName: ticket.customerName,
-      };
+    set((state) => {
+      // Tìm sản phẩm trong kho để trừ bớt số lượng
+      const updatedProducts = state.products.map((p) => {
+        if (p.sku === ticket.productSku) {
+          // Trừ bớt hàng, đảm bảo không giảm xuống dưới 0
+          const newQty = p.qty - ticket.qty;
+          return { ...p, qty: newQty < 0 ? 0 : newQty };
+        }
+        return p;
+      });
 
       return {
-        products: updatedProducts,
-        outboundTickets: [newOutbound, ...state.outboundTickets],
+        outboundTickets: [newTicket, ...state.outboundTickets],
+        products: updatedProducts, // Cập nhật lại danh sách sản phẩm mới
       };
-    }),
+    });
+  },
 }));
