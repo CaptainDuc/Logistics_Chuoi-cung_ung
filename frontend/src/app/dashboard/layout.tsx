@@ -12,6 +12,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
 
+<<<<<<< HEAD
   // Gọi các trạng thái đóng mở sidebar, tên admin và hàm xóa store (nếu có) từ Zustand store ra dùng
   // Thêm clearStore từ useAdminStore để xóa sạch dữ liệu khi đăng xuất
   const { isSidebarOpen, toggleSidebar, adminName, clearStore } =
@@ -20,6 +21,15 @@ export default function DashboardLayout({
   // Hàm xử lý Đăng xuất đồng bộ hệ thống
   const handleLogout = () => {
     // 1. Xóa thông tin trạng thái user trong Zustand Store (nếu Đức có viết hàm xóa)
+=======
+  // Gọi các trạng thái đóng mở sidebar, tên admin, chức vụ và hàm xóa store từ Zustand
+  const { isSidebarOpen, toggleSidebar, adminName, adminRole, clearStore } =
+    useAdminStore();
+
+  // Hàm xử lý Đăng xuất đồng bộ hệ thống
+  const handleLogout = () => {
+    // 1. Xóa thông tin trạng thái user trong Zustand Store
+>>>>>>> aea97c3c (Them action cho san pham)
     if (clearStore) {
       clearStore();
     }
@@ -147,13 +157,16 @@ export default function DashboardLayout({
             {isSidebarOpen ? "◀" : "▶"}
           </button>
 
-          {/* Avatar và Tên của Đức lấy trực tiếp từ Zustand */}
+          {/* Avatar và thông tin Chức vụ + Tên động từ Zustand */}
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold shadow-sm">
               {adminName ? adminName.charAt(0).toUpperCase() : "A"}
             </div>
             <span className="font-semibold text-sm text-slate-700 hidden sm:inline-block">
-              {adminName || "Admin"}
+              {/* Kết hợp định dạng mong muốn: Chức vụ + Tên đầy đủ */}
+              {adminRole && adminName
+                ? `${adminRole} ${adminName}`
+                : "Người dùng"}
             </span>
           </div>
         </header>

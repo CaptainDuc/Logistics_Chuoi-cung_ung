@@ -1,17 +1,21 @@
 import React from "react";
 import ProductQR from "@/components/productQR";
-import { Package, AlertTriangle, LayoutGrid } from "lucide-react";
+import { Package, AlertTriangle, LayoutGrid, MapPin } from "lucide-react";
 
 // KÍCH HOẠT CƠ CHẾ ISR: Tự động làm mới ngầm file HTML tĩnh sau mỗi 30 giây
 export const revalidate = 30;
 
+// Đã nâng cấp Interface trùng khớp cấu trúc thực thể MongoDB của bạn Backend
 interface Product {
-  id: string | number;
+  _id: string;
   name: string;
   sku: string;
-  qty: number;
-  unit?: string;
-  price?: number;
+  quantity: number;
+  minQuantity: number;
+  supplierId: string;
+  location: string;
+  price?: number; // Giữ lại trường price phục vụ giao diện cũ
+  unit?: string; // Giữ lại trường unit phục vụ giao diện cũ
 }
 
 // Hàm fetch dữ liệu trực tiếp tại Server-side
@@ -27,47 +31,40 @@ async function getProductsISR(): Promise<Product[]> {
   } catch (error) {
     console.error("Lỗi fetch dữ liệu ISR phát sinh:", error);
 
-    // Mảng dữ liệu giả định chất lượng cao để test giao diện lập tức
+    // Mảng dữ liệu giả định CHUẨN ĐỒNG BỘ 100% với file seed.js của Backend
     return [
       {
-        id: 1,
-        name: "Cáp mạng Cat6 UTP Lamit chất lượng cao",
-        sku: "CAP-CAT6-001",
-        qty: 45,
-        unit: "Cuộn",
-        price: 1250000,
-      },
-      {
-        id: 2,
-        name: "Đầu bấm mạng RJ45 AMP bọc kim chống nhiễu",
-        sku: "RJ45-AMP-GOLD",
-        qty: 8,
-        unit: "Hộp",
-        price: 350000,
-      },
-      {
-        id: 3,
-        name: "Switch Cisco 24-Port Gigabit Ethernet L2 Manage",
-        sku: "SW-CISCO-24G",
-        qty: 18,
+        _id: "prod-001",
+        name: "Máy tính xách tay Dell XPS 13",
+        sku: "LAP-DELL-XPS13-001",
+        quantity: 20,
+        minQuantity: 5,
+        supplierId: "sup-abc",
+        location: "Kệ A1 - Tầng 1",
         unit: "Cái",
-        price: 4800000,
+        price: 35000000,
       },
       {
-        id: 4,
-        name: "Kìm bấm mạng chuyên dụng đa năng Talon",
-        sku: "KIM-TALON-TLN",
-        qty: 5,
+        _id: "prod-002",
+        name: "Chuột không dây Logitech MX Master 3S",
+        sku: "MOU-LOGI-MX3S-002",
+        quantity: 50,
+        minQuantity: 20,
+        supplierId: "sup-abc",
+        location: "Kệ B3 - Tầng 1",
         unit: "Cái",
-        price: 620000,
+        price: 2500000,
       },
       {
-        id: 5,
-        name: "Bộ phát sóng không dây Băng tần kép Aruba AP",
-        sku: "WIFI-ARUBA-303",
-        qty: 22,
-        unit: "Bộ",
-        price: 3150000,
+        _id: "prod-003",
+        name: "Bàn phím cơ Keychron K8 Pro",
+        sku: "KEY-KEYC-K8P-003",
+        quantity: 0, // Bằng 0 theo đúng file seed để test trạng thái hết hàng
+        minQuantity: 10,
+        supplierId: "sup-xyz",
+        location: "Kệ C2 - Tầng 2",
+        unit: "Cái",
+        price: 1950000,
       },
     ];
   }
@@ -78,7 +75,7 @@ export default async function ProductsPage() {
 
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto min-h-screen bg-slate-50/40">
-      {/* THANH TIÊU ĐỀ TRANG CẤU HÌNH (ĐÃ BỎ BADGE ISR) */}
+      {/* THANH TIÊU ĐỀ TRANG CẤU HÌNH */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 pb-5">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -95,11 +92,13 @@ export default async function ProductsPage() {
       {/* KHỐI HIỂN THỊ DANH SÁCH DẠNG THẺ (CARD) GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {products.map((product) => {
-          const isLowStock = (Number(product.qty) || 0) < 15;
+          // THAY ĐỔI: So sánh động số lượng tồn với ngưỡng minQuantity của chính sản phẩm đó
+          const isLowStock =
+            (Number(product.quantity) || 0) < (product.minQuantity || 0);
 
           return (
             <div
-              key={product.id.toString()}
+              key={product._id}
               className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300/80 transition-all p-5 flex flex-col justify-between space-y-4"
             >
               {/* Phần thông tin phía trên của Thẻ vật tư */}
@@ -119,6 +118,18 @@ export default async function ProductsPage() {
                   <h3 className="font-bold text-slate-900 text-base line-clamp-2 h-12 leading-snug tracking-tight">
                     {product.name}
                   </h3>
+
+                  {/* Hiển thị vị trí kệ kho lấy từ dữ liệu của Backend */}
+                  <div className="flex items-center gap-1 text-xs text-slate-400 mt-2">
+                    <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    <span className="truncate">
+                      Vị trí:{" "}
+                      <span className="text-slate-600 font-medium">
+                        {product.location || "Chưa xếp kệ"}
+                      </span>
+                    </span>
+                  </div>
+
                   <p className="text-xs text-slate-400 font-medium mt-1">
                     Đơn vị tính:{" "}
                     <span className="text-slate-600 font-semibold">
@@ -139,7 +150,7 @@ export default async function ProductsPage() {
                       isLowStock ? "text-rose-600" : "text-slate-800"
                     }`}
                   >
-                    {product.qty}
+                    {product.quantity}
                   </p>
                   <p className="text-xs font-bold text-blue-600 font-mono pt-1">
                     {product.price
@@ -150,7 +161,7 @@ export default async function ProductsPage() {
 
                 {/* GỌI ĐẾN COMPONENT HIỂN THỊ MÃ QR TỪ MÃ SKU AN TOÀN */}
                 <ProductQR
-                  sku={product.sku || product.id.toString()}
+                  sku={product.sku || product._id}
                   name={product.name}
                 />
               </div>
