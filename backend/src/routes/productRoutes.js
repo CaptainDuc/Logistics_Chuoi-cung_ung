@@ -15,7 +15,7 @@ router.use(protect);
 /**
  * GET /api/products
  * Lấy toàn bộ danh sách sản phẩm.
- * Query params: ?search= (tìm theo tên), ?supplierId= (lọc theo nhà cung cấp).
+ *  Query params: ?search= (tìm theo tên), ?supplierId= (lọc theo nhà cung cấp).
  */
 router.get('/', productController.layTatCaSanPham);
 
