@@ -10,6 +10,7 @@ import {
   User,
   Calendar,
   FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore"; // Tích hợp đúng Store của Đức
 
@@ -32,7 +33,7 @@ export default function InboundPage() {
     if (fetchProducts) {
       fetchProducts();
     }
-  }, [fetchProducts]);
+  }, []);
 
   // State quản lý tìm kiếm phiếu nhập
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,23 +41,66 @@ export default function InboundPage() {
   // State quản lý Đóng/Mở Modal và Form lập phiếu
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    productId: "", // Lưu _id của sản phẩm chọn để truyền sang API transaction
     productSku: "",
     qty: 1,
     note: "",
   });
 
+  const handleExportInboundExcel = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        "http://localhost:5000/api/inventory/export-excel?type=Import",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Không thể xuất Excel nhập kho");
+      }
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = "bao-cao-nhap-kho.xlsx";
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+
+      alert("Xuất Excel nhập kho thất bại!");
+    }
+  }; // Lọc an toàn danh sách sản phẩm hiển thị trên bảng để xem trạng thái
   // Khi mở modal, tự động chọn sản phẩm đầu tiên trong danh bãi kho (nếu có)
   const handleOpenModal = () => {
     if (products && products.length > 0) {
-      setFormData({
-        productId: products[0]._id,
-        productSku: products[0].sku,
-        qty: 1,
-        note: "",
-      });
+      const firstProduct = products[0];
+
+      if (firstProduct) {
+        setFormData({
+          productSku: firstProduct.sku || "",
+          qty: 1,
+          note: "",
+        });
+      }
     } else {
-      setFormData({ productId: "", productSku: "", qty: 1, note: "" });
+      setFormData({ productSku: "", qty: 1, note: "" });
     }
     setIsModalOpen(true);
   };
@@ -64,16 +108,16 @@ export default function InboundPage() {
   // Xử lý hành động nhấn tạo phiếu nhập kho bổ sung
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.productId) {
-      alert("Đức vui lòng chọn một sản phẩm để nhập kho nha!");
+    if (!formData.productSku) {
+      alert("Đức vui lòng chọn một sản phẩm để nhập kho nhé!");
       return;
     }
 
     try {
       // 🔥 Gọi hàm xử lý giao dịch thực tế trong Store của Đức: truyền đúng productId, type: 'Import', quantity
       await addInventoryTransaction({
-        productId: formData.productId,
-        type: "INBOUND",
+        sku: formData.productSku,
+        type: "Import",
         quantity: formData.qty,
       });
 
@@ -85,7 +129,6 @@ export default function InboundPage() {
     }
   };
 
-  // Lọc an toàn danh sách sản phẩm hiển thị trên bảng để xem trạng thái
   const safeProducts = products || [];
   const filteredProducts = safeProducts.filter(
     (product) =>
@@ -123,12 +166,23 @@ export default function InboundPage() {
         </div>
 
         {/* Nút Tạo phiếu nhập */}
-        <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
-        >
-          <Plus className="w-4 h-4" /> Tạo phiếu nhập kho
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportInboundExcel}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Xuất Excel Nhập Kho
+          </button>
+
+          <button
+            onClick={handleOpenModal}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Tạo phiếu nhập kho
+          </button>
+        </div>
       </div>
 
       {/* Thanh Tìm Kiếm */}
@@ -230,21 +284,20 @@ export default function InboundPage() {
                 </label>
                 {safeProducts.length > 0 ? (
                   <select
-                    value={formData.productId}
+                    value={formData.productSku}
                     onChange={(e) => {
                       const selectedProd = safeProducts.find(
-                        (p) => p._id === e.target.value
+                        (p) => p.sku === e.target.value
                       );
                       setFormData({
                         ...formData,
-                        productId: e.target.value,
                         productSku: selectedProd ? selectedProd.sku : "",
                       });
                     }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all cursor-pointer text-slate-700"
                   >
                     {safeProducts.map((p) => (
-                      <option key={p._id} value={p._id}>
+                      <option key={p._id} value={p.sku}>
                         {p.name} ({p.sku}) — Tồn: {p.quantity ?? 0}
                       </option>
                     ))}
@@ -267,12 +320,12 @@ export default function InboundPage() {
                   min="1"
                   required
                   value={formData.qty}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFormData({
                       ...formData,
                       qty: parseInt(e.target.value) || 1,
-                    })
-                  }
+                    });
+                  }}
                   className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all font-mono"
                 />
               </div>

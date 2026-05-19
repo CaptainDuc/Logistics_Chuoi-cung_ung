@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useAdminStore } from "@/store/useAdminStore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,19 +16,26 @@ export default function DashboardLayout({
   const { isSidebarOpen, toggleSidebar, adminName, adminRole, clearStore } =
     useAdminStore();
 
+  const loadUserFromStorage = useAdminStore(
+    (state) => state.loadUserFromStorage
+  );
+
+  useEffect(() => {
+    loadUserFromStorage();
+  }, []);
   // Hàm xử lý Đăng xuất đồng bộ hệ thống
   const handleLogout = () => {
-    // 1. Xóa thông tin trạng thái user trong Zustand Store
-    if (clearStore) {
-      clearStore();
-    }
+    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userName");
 
-    // 2. Xóa sạch cookie để middleware chặn lại không cho lọt vào dashboard nữa
-    document.cookie = "auth_token=; path=/; max-age=0; SameSite=Strict";
+    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-    // 3. Đẩy thủ kho văng ngược ra trang login
+    clearStore();
+
     router.push("/login");
-    router.refresh();
   };
 
   return (

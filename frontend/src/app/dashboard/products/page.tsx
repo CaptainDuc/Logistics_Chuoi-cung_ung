@@ -8,7 +8,8 @@ import {
   LayoutGrid,
   MapPin,
   Trash2,
-} from "lucide-react"; // 🔥 ĐỒNG BỘ: Thêm icon Trash2
+  FileSpreadsheet,
+} from "lucide-react";
 import AddProductModal from "@/components/AddProductModal";
 import { useWarehouseStore } from "@/store/useWarehouseStore"; // Import Store của Đức
 
@@ -49,6 +50,47 @@ export default function ProductsPage() {
     }
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        "http://localhost:5000/api/inventory/export-excel",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Không thể xuất file Excel");
+      }
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = "bao-cao-kho-hang.xlsx";
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+
+      alert("Có lỗi xảy ra khi xuất Excel!");
+    }
+  };
   // Nếu Store đang gọi API thì hiển thị hiệu ứng Loading quét xung
   if (isLoading) {
     return (
@@ -74,7 +116,17 @@ export default function ProductsPage() {
             tác máy quét hoặc ứng dụng di động kiểm kho.
           </p>
         </div>
-        <AddProductModal onSuccess={fetchProducts} />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm transition-all"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Xuất Excel Kho Hàng
+          </button>
+
+          <AddProductModal onSuccess={fetchProducts} />
+        </div>
       </div>
 
       {/* KHỐI HIỂN THỊ DANH SÁCH DẠNG THẺ (CARD) GRID */}
@@ -105,7 +157,11 @@ export default function ProductsPage() {
 
                     {/* 🔥 ĐỒNG BỘ: Nút xóa sản phẩm xuất hiện khi hover vào card hoặc luôn hiển thị trên mobile */}
                     <button
-                      onClick={() => handleDelete(product._id, product.name)}
+                      onClick={() => {
+                        if (product._id) {
+                          handleDelete(product._id, product.name);
+                        }
+                      }}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-lg transition-all"
                       title="Xóa sản phẩm"
                     >

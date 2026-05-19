@@ -1,135 +1,198 @@
+// src/store/useWarehouseStore.ts
 import { create } from "zustand";
 import axios from "axios";
 
-export interface Product {
+const API_URL = "http://localhost:5000/api";
+
+// 🔑 LẤY CHÍNH XÁC KEY "accessToken" MÀ LOGIN SẼ LƯU
+const getAuthHeader = () => {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const token =
+    localStorage.getItem("token") || localStorage.getItem("accessToken");
+
+  if (!token) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+interface Product {
   _id: string;
   name: string;
   sku: string;
   quantity: number;
   minQuantity: number;
-  location: string;
-  supplierId?: { _id: string; name: string } | null;
+  location?: string;
+  supplierId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   trangThaiTonKho?: string;
 }
 
-// 🔥 CẬP NHẬT INTERFACE: Quản lý cả sản phẩm và nhật ký giao dịch kho
-interface WarehouseState {
-  products: Product[];
-  transactions: any[]; // Lưu lịch sử phiếu nhập / xuất kho thật từ MongoDB
-  isLoading: boolean;
-  error: string | null;
-  fetchProducts: () => Promise<void>;
-  fetchTransactions: () => Promise<void>; // Hàm kéo lịch sử giao dịch về Dashboard
-  addProduct: (
-    productData: Omit<Product, "_id" | "trangThaiTonKho">
-  ) => Promise<void>;
-
-  addInventoryTransaction: (transaction: {
-    productId: string;
-    type: "INBOUND" | "OUTBOUND";
-    quantity: number;
-    name?: string;
-  }) => Promise<void>;
+interface Transaction {
+  _id: string;
+  name: string;
+  type: "Import" | "Export";
+  quantity: number;
+  date: string;
+  badgeColor?: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+interface WarehouseState {
+  products: Product[];
+  transactions: Transaction[];
+  isLoading: boolean;
+  addInventoryTransaction: (data: {
+    sku: string;
+    type: "Import" | "Export";
+    quantity: number;
+  }) => Promise<boolean>;
+  fetchProducts: () => Promise<void>;
+  fetchTransactions: () => Promise<void>;
+  addProduct: (product: Omit<Product, "_id">) => Promise<boolean>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<boolean>;
+  deleteProduct: (id: string) => Promise<boolean>;
+}
+
+export enum TransactionType {
+  INBOUND = "INBOUND",
+  OUTBOUND = "OUTBOUND",
+}
 
 export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   products: [],
-  transactions: [], // Khởi tạo mảng nhật ký trống sạch sẽ ban đầu
+  transactions: [],
   isLoading: false,
-  error: null,
 
-  // 1. Hàm lấy danh sách sản phẩm từ Backend thật
+  addInventoryTransaction: async (data) => {
+    try {
+      const response = await axios.post(`${API_URL}/inventory/scan`, data, {
+        headers: getAuthHeader(),
+      });
+
+      if (response.data.success) {
+        await get().fetchProducts();
+        await get().fetchTransactions();
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Add inventory transaction error:", error);
+
+      return false;
+    }
+  },
   fetchProducts: async () => {
     set({ isLoading: true });
     try {
-      const response = await axios.get(`${API_URL}/products`);
-      // Backend trả về dạng { success: true, data: [...] } nên phải lấy response.data.data
-      if (response.data && response.data.success) {
-        set({ products: response.data.data, isLoading: false });
-      } else {
-        set({ products: [], isLoading: false });
-      }
-    } catch (error) {
-      console.error("Lỗi lấy sản phẩm từ MongoDB:", error);
-      set({ products: [], isLoading: false });
-    }
-  },
-
-  // 2. 🔥 BỔ SUNG: Hàm lấy danh sách toàn bộ Nhật ký giao dịch từ Backend thật
-  fetchTransactions: async () => {
-    try {
-      const response = await axios.get(`${API_URL}/inventory/transactions`);
-      if (response.data && response.data.success) {
-        set({ transactions: response.data.data });
-      } else {
-        set({ transactions: [] });
-      }
-    } catch (error) {
-      console.error("Lỗi lấy nhật ký giao dịch từ MongoDB:", error);
-      set({ transactions: [] });
-    }
-  },
-
-  // 3. Hàm thêm mới một sản phẩm vào Database thật
-  addProduct: async (newProduct) => {
-    try {
-      const response = await axios.post(`${API_URL}/products`, newProduct);
-      const addedProduct = response.data.data;
-
-      set((state) => ({
-        products: [addedProduct, ...state.products],
-      }));
-    } catch (error) {
-      console.error("Lỗi khi tạo sản phẩm trong Store:", error);
-      throw error;
-    }
-  },
-
-  // 4. 🔥 CẬP NHẬT HÀM: Xử lý Nhập / Xuất kho real-time tự nhảy số liệu
-  addInventoryTransaction: async (transaction) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch(`${API_URL}/inventory/transaction`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(transaction),
+      const response = await axios.get(`${API_URL}/products`, {
+        headers: getAuthHeader(),
       });
-      const result = await response.json();
-
-      if (result.success) {
-        // Sau khi tạo phiếu thành công -> Gọi lại API kéo dữ liệu mới nhất
-        // của cả Sản phẩm và Giao dịch về để Dashboard tự nhảy số real-time!
-        await get().fetchProducts();
-        await get().fetchTransactions();
-      } else {
-        set({
-          error: result.message || "Giao dịch bãi kho thất bại!",
-          isLoading: false,
-        });
+      if (response.data && response.data.success) {
+        set({ products: response.data.data || [] });
       }
     } catch (error: any) {
-      console.error("Lỗi khi gửi phiếu nhập/xuất kho:", error);
-      set({
-        error: error.message || "Lỗi kết nối hệ thống!",
-        isLoading: false,
-      });
+      console.error("Lỗi fetchProducts:", error);
+      if (error.response?.status === 401 && typeof window !== "undefined") {
+        // Xóa toàn bộ auth
+        localStorage.removeItem("token");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("userRole");
+
+        // Xóa cookie middleware
+        document.cookie =
+          "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+        // Chỉ redirect nếu chưa ở login
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
+    } finally {
+      set({ isLoading: false });
     }
   },
-  // Thêm vào trong useWarehouseStore nếu chưa có:
-  deleteProduct: async (id: string) => {
-    set({ isLoading: true });
+
+  fetchTransactions: async () => {
     try {
-      await axios.delete(`${API_URL}/products/${id}`); // Thay đường dẫn API thật của Đức
-      // Cập nhật lại danh sách sản phẩm ở local sau khi xóa thành công
-      set((state) => ({
-        products: state.products.filter((p) => p._id !== id),
-        isLoading: false,
+      const response = await axios.get(`${API_URL}/inventory/logs`, {
+        headers: getAuthHeader(),
+      });
+
+      const mappedTransactions = (response.data.data || []).map((t: any) => ({
+        _id: t._id,
+        name: t.productId?.name || "Không rõ sản phẩm",
+        type: t.type,
+        quantity: t.quantity || 0,
+        date: new Date(t.createdAt).toLocaleDateString("vi-VN"),
+        badgeColor:
+          t.type === "Import"
+            ? "bg-blue-50 border-blue-200 text-blue-600"
+            : "bg-rose-50 border-rose-200 text-rose-600",
       }));
-    } catch (err) {
-      console.error("Lỗi khi xóa sản phẩm:", err);
-      set({ isLoading: false });
+
+      set({
+        transactions: mappedTransactions,
+      });
+    } catch (error) {
+      console.error("Fetch transactions error:", error);
+    }
+  },
+
+  addProduct: async (product) => {
+    try {
+      const response = await axios.post(`${API_URL}/products`, product, {
+        headers: getAuthHeader(),
+      });
+      if (response.data && response.data.success) {
+        await get().fetchProducts();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Lỗi addProduct:", error);
+      return false;
+    }
+  },
+
+  updateProduct: async (id, product) => {
+    try {
+      const response = await axios.put(`${API_URL}/products/${id}`, product, {
+        headers: getAuthHeader(),
+      });
+      if (response.data && response.data.success) {
+        await get().fetchProducts();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Lỗi updateProduct:", error);
+      return false;
+    }
+  },
+
+  deleteProduct: async (id) => {
+    try {
+      const response = await axios.delete(`${API_URL}/products/${id}`, {
+        headers: getAuthHeader(),
+      });
+      if (response.data && response.data.success) {
+        await get().fetchProducts();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Lỗi deleteProduct:", error);
+      return false;
     }
   },
 }));

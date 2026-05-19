@@ -11,6 +11,7 @@ import {
   Calendar,
   FileText,
   Building2,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 
@@ -33,12 +34,11 @@ export default function OutboundPage() {
     if (fetchProducts) {
       fetchProducts();
     }
-  }, [fetchProducts]);
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    productId: "", // Lưu _id để gửi lên API transaction
     productSku: "",
     qty: 1,
     customerName: "",
@@ -47,14 +47,17 @@ export default function OutboundPage() {
   // Tự động chọn sản phẩm đầu tiên khi mở modal xuất kho
   const handleOpenModal = () => {
     if (products && products.length > 0) {
-      setFormData({
-        productId: products[0]._id,
-        productSku: products[0].sku,
-        qty: 1,
-        customerName: "",
-      });
+      const firstProduct = products[0];
+
+      if (firstProduct) {
+        setFormData({
+          productSku: firstProduct.sku || "",
+          qty: 1,
+          customerName: "",
+        });
+      }
     } else {
-      setFormData({ productId: "", productSku: "", qty: 1, customerName: "" });
+      setFormData({ productSku: "", qty: 1, customerName: "" });
     }
     setIsModalOpen(true);
   };
@@ -62,13 +65,13 @@ export default function OutboundPage() {
   // Xử lý khi bấm xác nhận xuất kho bổ sung
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.productId) {
+    if (!formData.productSku) {
       alert("Đức vui lòng chọn một sản phẩm để xuất kho nhé!");
       return;
     }
 
     // Tìm sản phẩm khớp để kiểm tra tồn kho thực tế trước khi bấm xuất
-    const selectedProduct = products.find((p) => p._id === formData.productId);
+    const selectedProduct = products.find((p) => p.sku === formData.productSku);
 
     // Sửa lỗi gạch đỏ: So sánh với p.quantity thay vì p.qty cũ
     if (selectedProduct && formData.qty > (selectedProduct.quantity || 0)) {
@@ -85,8 +88,8 @@ export default function OutboundPage() {
     try {
       // 🔥 Gọi hàm xử lý giao dịch thực tế: truyền đúng productId, type: 'Export', quantity
       await addInventoryTransaction({
-        productId: formData.productId,
-        type: "OUTBOUND",
+        sku: formData.productSku,
+        type: "Export",
         quantity: formData.qty,
       });
 
@@ -98,6 +101,47 @@ export default function OutboundPage() {
     }
   };
 
+  const handleExportOutboundExcel = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        "http://localhost:5000/api/inventory/export-excel?type=Export",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Không thể xuất Excel");
+      }
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = "bao-cao-xuat-kho.xlsx";
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+
+      alert("Xuất Excel xuất kho thất bại!");
+    }
+  };
   // Lọc an toàn danh sách sản phẩm hiển thị trên bảng
   const safeProducts = products || [];
   const filteredProducts = safeProducts.filter(
@@ -136,12 +180,23 @@ export default function OutboundPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
-        >
-          <Plus className="w-4 h-4" /> Tạo phiếu xuất kho
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportOutboundExcel}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Xuất Excel Xuất Kho
+          </button>
+
+          <button
+            onClick={handleOpenModal}
+            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Tạo phiếu xuất kho
+          </button>
+        </div>
       </div>
 
       {/* Tìm kiếm */}
@@ -241,22 +296,18 @@ export default function OutboundPage() {
                 </label>
                 {safeProducts.length > 0 ? (
                   <select
-                    value={formData.productId}
+                    value={formData.productSku}
                     onChange={(e) => {
-                      const selectedProd = safeProducts.find(
-                        (p) => p._id === e.target.value
-                      );
                       setFormData({
                         ...formData,
-                        productId: e.target.value,
-                        productSku: selectedProd ? selectedProd.sku : "",
+                        productSku: e.target.value,
                       });
                     }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-rose-500 outline-none transition-all cursor-pointer text-slate-700"
                   >
                     {safeProducts.map((p) => (
                       /* Sửa triệt để lỗi TypeScript: p._id làm key và p.quantity lấy số lượng tồn thực tế từ database Atlas */
-                      <option key={p._id} value={p._id}>
+                      <option key={p._id} value={p.sku}>
                         {p.name} ({p.sku}) — Tồn thực tế: {p.quantity ?? 0}
                       </option>
                     ))}
