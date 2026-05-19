@@ -72,11 +72,11 @@ const guiEmailCanhBao = async (sanPham) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`[Email] ✅ Đã gửi email cảnh báo sắp hết hàng cho sản phẩm: "${sanPham.name}" (SKU: ${sanPham.sku})`);
+    console.log(`[Email]  Đã gửi email cảnh báo sắp hết hàng cho sản phẩm: "${sanPham.name}" (SKU: ${sanPham.sku})`);
 
   } catch (err) {
     // Ghi log lỗi nhưng KHÔNG làm gián đoạn luồng xuất kho.
-    console.error(`[Email] ❌ Gửi email cảnh báo thất bại cho sản phẩm "${sanPham.name}":`, err.message);
+    console.error(`[Email]  Gửi email cảnh báo thất bại cho sản phẩm "${sanPham.name}":`, err.message);
   }
 };
 
@@ -320,7 +320,7 @@ const xuatBaoCaoExcel = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${tenFile}"`);
     res.setHeader('Content-Length', buffer.length);
 
-    console.log(`[Inventory] ✅ Đã xuất báo cáo Excel: "${tenFile}" (${danhSachSanPham.length} sản phẩm)`);
+    console.log(`[Inventory]  Đã xuất báo cáo Excel: "${tenFile}" (${danhSachSanPham.length} sản phẩm)`);
 
     return res.status(200).send(buffer);
 
