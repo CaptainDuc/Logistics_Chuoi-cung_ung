@@ -139,7 +139,7 @@ async function chaySeedDuLieu() {
     console.log('============================================\n');
 
   } catch (err) {
-    console.error('\n[SEED] ❌ Đã xảy ra lỗi trong quá trình seed dữ liệu!');
+    console.error('\n[SEED]  Đã xảy ra lỗi trong quá trình seed dữ liệu!');
     console.error(`[SEED] Lỗi: ${err.message}`);
 
     if (mongoose.connection.readyState === 1) {
