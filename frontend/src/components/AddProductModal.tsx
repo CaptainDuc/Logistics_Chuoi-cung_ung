@@ -28,33 +28,38 @@ const STORAGE_LOCATIONS = [
 ];
 
 export default function AddProductModal({ onSuccess }: AddProductModalProps) {
-  const { products } = useWarehouseStore();
+  // ✅ ĐÚNG: Đưa việc lấy dữ liệu từ Zustand Store vào trong Component body
+  const { products, addProduct } = useWarehouseStore();
+
+  // ✅ ĐÚNG: Tính toán danh sách vị trí đã bận dựa trên dữ liệu state mới nhất của store
   const busyLocations = (products as any[])
-    .filter((p) => (Number(p.quantity) || 0) > 0 && p.location)
-    .map((p) => String(p.location).trim());
+    .filter((p) => (Number(p.quantity) || 0) > 0)
+    .map((p) => p.location?.trim());
+
+  // Lọc ra các vị trí còn trống để hiển thị lên thẻ <select>
+  const availableLocations = STORAGE_LOCATIONS.filter(
+    (loc) => !busyLocations.includes(loc.trim())
+  );
+
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  const [location, setLocation] = useState(""); // Mặc định chọn vị trí đầu tiên
-  const [quantity, setQuantity] = useState(1); // 🔥 ĐỒNG BỘ: Tạo thêm state quản lý số lượng nhập ban đầu
+  // Mặc định chọn vị trí trống đầu tiên nếu có, nếu không thì lấy giá trị mặc định hệ thống
+  const [location, setLocation] = useState(
+    availableLocations[0] || STORAGE_LOCATIONS[0]
+  );
+  const [quantity, setQuantity] = useState(1);
   const [minQuantity, setMinQuantity] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Lấy hành động addProduct từ Zustand Store ra để sử dụng
-  const addProduct = useWarehouseStore((state) => state.addProduct);
-
   const handleGenerateSKU = () => {
     const prefix = "SKU";
-    const timestamp = Date.now().toString().slice(-8);
-    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
     setSku(`${prefix}-${timestamp}-${randomStr}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    if (!location || location === "") {
-      alert("Đức ơi, vui lòng click chọn một vị trí kho còn trống nha!");
-      return;
-    }
     e.preventDefault();
     if (!name || !sku || !location) {
       alert("Đức vui lòng điền đầy đủ thông tin nha!");
@@ -63,24 +68,22 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
 
     setIsSubmitting(true);
     try {
-      // 🚀 GỌI THẲNG API QUA STORE - Truyền đúng giá trị biến quantity thực tế Đức nhập
       await addProduct({
         sku,
         name,
         location,
-        quantity: Number(quantity), // 🔥 ĐỒNG BỘ: Đổi từ số 0 cứng sang biến state quantity nha
+        quantity: Number(quantity),
         minQuantity,
-        supplierId: null, // Để tạm null nếu Đức chưa chọn Nhà cung cấp trong form
+        supplierId: null,
       });
 
-      // Reset các trường dữ liệu trong form về trạng thái trống
       setName("");
-      setLocation(STORAGE_LOCATIONS[0]);
-      setQuantity(1); // Reset số lượng về 1
+      // Cập nhật lại vị trí mặc định sau khi reset form
+      setLocation(availableLocations[0] || STORAGE_LOCATIONS[0]);
+      setQuantity(1);
       setMinQuantity(5);
       setIsOpen(false);
 
-      // Nếu trang cha có truyền hàm callback hành động thì kích hoạt
       if (onSuccess) onSuccess();
 
       alert(
@@ -94,16 +97,16 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
     }
   };
 
-  const availableLocations = STORAGE_LOCATIONS.filter(
-    (loc) => !busyLocations.includes(loc.trim())
-  );
-
   return (
     <>
       <button
         onClick={() => {
           setIsOpen(true);
           handleGenerateSKU();
+          // Cập nhật lại vị trí hợp lệ khi mở modal lên
+          if (availableLocations.length > 0) {
+            setLocation(availableLocations[0]);
+          }
         }}
         className="flex items-center gap-2 bg-slate-900 text-white font-medium px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-all active:scale-95 text-sm shadow-sm"
       >
@@ -174,24 +177,25 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
                   <MapPin className="w-3.5 h-3.5" /> Vị trí xếp kệ
                 </label>
                 <select
-                  required
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-slate-50/50 cursor-pointer text-slate-700"
                 >
-                  {/* Dòng nhắc nhở bắt buộc click chọn */}
-                  <option value="">-- Vui lòng chọn một kệ kho trống --</option>
-
-                  {/* Chỉ hiển thị các vị trí kho chưa có ai ngồi */}
-                  {availableLocations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
+                  {availableLocations.length > 0 ? (
+                    availableLocations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled value="">
+                      Kho đã hết vị trí trống
                     </option>
-                  ))}
+                  )}
                 </select>
               </div>
 
-              {/* 🔥 ĐỒNG BỘ: Chèn thêm trường nhập Số lượng ban đầu */}
+              {/* Số lượng nhập kho ban đầu */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Layers className="w-3.5 h-3.5" /> Số lượng nhập kho ban đầu
@@ -234,7 +238,7 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || availableLocations.length === 0}
                   className="px-4 py-2 text-sm font-medium bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
                 >
                   {isSubmitting ? "Đang lưu..." : "Xác nhận tạo"}

@@ -73,7 +73,7 @@ export default function InboundPage() {
       // 🔥 Gọi hàm xử lý giao dịch thực tế trong Store của Đức: truyền đúng productId, type: 'Import', quantity
       await addInventoryTransaction({
         productId: formData.productId,
-        type: "Import",
+        type: "INBOUND",
         quantity: formData.qty,
       });
 

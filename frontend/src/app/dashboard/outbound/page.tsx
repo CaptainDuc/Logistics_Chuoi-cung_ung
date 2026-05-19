@@ -86,7 +86,7 @@ export default function OutboundPage() {
       // 🔥 Gọi hàm xử lý giao dịch thực tế: truyền đúng productId, type: 'Export', quantity
       await addInventoryTransaction({
         productId: formData.productId,
-        type: "Export",
+        type: "OUTBOUND",
         quantity: formData.qty,
       });
 

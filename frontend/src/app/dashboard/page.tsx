@@ -58,17 +58,19 @@ export default function DashboardPage() {
   }));
 
   // --- HÀM XUẤT PHIẾU KHO HÀNG ---
+  // --- HÀM XUẤT PHIẾU KHO HÀNG CHUẨN MẪU C30 - HD (THÔNG TƯ 107) ---
   const exportToWarehouseExcel = async (
     dataListInput: any[],
-    titleFile: string = "Phieu_Kho_Hang"
+    titleFile: string = "Phieu_Nhap_Kho"
   ) => {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Phieu_Kho_Hang");
-    worksheet.views = [{ showGridLines: false }];
+    const worksheet = workbook.addWorksheet("Phieu_Kho");
+    worksheet.views = [{ showGridLines: true }]; // Bật gridlines hiển thị cho chuẩn khung
 
+    // Định nghĩa độ rộng các cột (A đến H)
     worksheet.columns = [
-      { key: "stt", width: 7 },
-      { key: "name", width: 42 },
+      { key: "stt", width: 8 },
+      { key: "name", width: 40 },
       { key: "sku", width: 16 },
       { key: "unit", width: 12 },
       { key: "qty_req", width: 14 },
@@ -77,6 +79,7 @@ export default function DashboardPage() {
       { key: "amount", width: 16 },
     ];
 
+    // Cấu hình Font chữ chuẩn Times New Roman
     const fontMain = { name: "Times New Roman", size: 11 };
     const fontBold = { name: "Times New Roman", size: 11, bold: true };
     const fontItalic = { name: "Times New Roman", size: 11, italic: true };
@@ -91,60 +94,106 @@ export default function DashboardPage() {
       right: borderThinSide,
     };
 
-    worksheet.getCell("A1").value = "Đơn vị: .........................";
+    // --- 1. PHẦN TIÊU ĐỀ HÀNH CHÍNH PHÍA TRÊN (Dòng 1 - Dòng 11) ---
+    // Góc trái: Đơn vị & Mã QHNS
+    worksheet.getCell("A1").value =
+      "Đơn vị:...............................................";
     worksheet.getCell("A1").font = fontMain;
-    worksheet.getCell("H1").value = "Mẫu số: 02 - VT";
-    worksheet.getCell("H1").font = fontBold;
-    worksheet.getCell("H1").alignment = { horizontal: "right" };
-
-    worksheet.getCell("A2").value = "Bộ phận: .......................";
+    worksheet.getCell("A2").value =
+      "Mã QHNS:..........................................";
     worksheet.getCell("A2").font = fontMain;
-    worksheet.getCell("H2").value = "(Kèm theo Thông tư số 99/2025/TT-BTC";
-    worksheet.getCell("H2").font = fontItalic;
-    worksheet.getCell("H2").alignment = { horizontal: "right" };
-    worksheet.getCell("H3").value =
-      "ngày 27 tháng 10 năm 2025 của Bộ trưởng Bộ Tài chính)";
-    worksheet.getCell("H3").font = fontItalic;
-    worksheet.getCell("H3").alignment = { horizontal: "right" };
 
-    worksheet.getCell("D5").value = titleFile.toUpperCase().replace(/_/g, " ");
-    worksheet.getCell("D5").font = {
+    // Góc phải: Mẫu số C30 - HD theo Thông tư 107
+    worksheet.mergeCells("F1:H1");
+    worksheet.getCell("F1").value = "Mẫu số C30 - HD";
+    worksheet.getCell("F1").font = fontBold;
+    worksheet.getCell("F1").alignment = { horizontal: "right" };
+
+    worksheet.mergeCells("F2:H2");
+    worksheet.getCell("F2").value =
+      "(Ban hành kèm theo Thông tư số 107/2017/TT-BTC";
+    worksheet.getCell("F2").font = fontItalic;
+    worksheet.getCell("F2").alignment = { horizontal: "right" };
+
+    worksheet.mergeCells("F3:H3");
+    worksheet.getCell("F3").value = "ngày 24/11/2017)";
+    worksheet.getCell("F3").font = fontItalic;
+    worksheet.getCell("F3").alignment = { horizontal: "right" };
+
+    let displayTitle = "PHIẾU TỔNG KHO"; // Mặc định nếu không rơi vào 2 trường hợp dưới
+    const lowerTitle = titleFile.toLowerCase();
+
+    if (lowerTitle.includes("nhap") || lowerTitle.includes("inbound")) {
+      displayTitle = "PHIẾU NHẬP KHO";
+    } else if (lowerTitle.includes("xuat") || lowerTitle.includes("outbound")) {
+      displayTitle = "PHIẾU XUẤT KHO";
+    }
+    // Tiêu đề chính của Phiếu (Dòng 5 -> 7)
+    worksheet.mergeCells("A5:H5");
+    worksheet.getCell("A5").value = displayTitle;
+    worksheet.getCell("A5").font = {
       name: "Times New Roman",
       size: 16,
       bold: true,
     };
-    worksheet.getCell("D5").alignment = { horizontal: "center" };
+    worksheet.getCell("A5").alignment = { horizontal: "center" };
 
     const today = new Date();
-    worksheet.getCell("D6").value = `Ngày ${today.getDate()} tháng ${
+    worksheet.mergeCells("A6:H6");
+    worksheet.getCell("A6").value = `Ngày ${today.getDate()} tháng ${
       today.getMonth() + 1
     } năm ${today.getFullYear()}`;
-    worksheet.getCell("D6").font = fontItalic;
-    worksheet.getCell("D6").alignment = { horizontal: "center" };
+    worksheet.getCell("A6").font = fontItalic;
+    worksheet.getCell("A6").alignment = { horizontal: "center" };
 
-    worksheet.getCell("D7").value = "Số: .........................";
-    worksheet.getCell("D7").font = fontMain;
-    worksheet.getCell("D7").alignment = { horizontal: "center" };
+    worksheet.mergeCells("A7:H7");
+    worksheet.getCell("A7").value = "Số: .........................";
+    worksheet.getCell("A7").font = fontMain;
+    worksheet.getCell("A7").alignment = { horizontal: "center" };
 
-    worksheet.mergeCells("A13:A14");
-    worksheet.getCell("A13").value = "STT";
-    worksheet.mergeCells("B13:B14");
-    worksheet.getCell("B13").value =
-      "Tên, nhãn hiệu, quy cách, phẩm chất vật tư\n(sản phẩm, hàng hóa)";
-    worksheet.mergeCells("C13:C14");
-    worksheet.getCell("C13").value = "Mã số\n(SKU)";
-    worksheet.mergeCells("D13:D14");
-    worksheet.getCell("D13").value = "Đơn vị\ntính";
-    worksheet.mergeCells("E13:F13");
-    worksheet.getCell("E13").value = "Số lượng";
-    worksheet.getCell("E14").value = "Yêu cầu";
-    worksheet.getCell("F14").value = "Thực xuất";
-    worksheet.mergeCells("G13:G14");
-    worksheet.getCell("G13").value = "Đơn giá";
-    worksheet.mergeCells("H13:H14");
-    worksheet.getCell("H13").value = "Thành tiền";
+    // Thông tin người giao, chứng từ kèm theo (Dòng 8 -> 10)
+    worksheet.mergeCells("A8:H8");
+    worksheet.getCell("A8").value =
+      "- Họ tên người giao:....................................................................................................................................";
+    worksheet.getCell("A8").font = fontMain;
 
-    for (let r = 13; r <= 14; r++) {
+    worksheet.mergeCells("A9:H9");
+    worksheet.getCell("A9").value =
+      "- Theo.......................................... số........................... ngày........... tháng.......... năm........... của.....................................";
+    worksheet.getCell("A9").font = fontMain;
+
+    worksheet.mergeCells("A10:H10");
+    worksheet.getCell("A10").value =
+      "- Nhập tại kho:........................................................................ địa điểm......................................................................";
+    worksheet.getCell("A10").font = fontMain;
+
+    // --- 2. PHẦN ĐỊNH NGHĨA TIÊU ĐỀ BẢNG (Dòng 12 - Dòng 14) ---
+    // Hàng 12 & 13: Gộp ô tạo tiêu đề cột phức tạp
+    worksheet.mergeCells("A12:A13");
+    worksheet.getCell("A12").value = "Số\nTT";
+
+    worksheet.mergeCells("B12:B13");
+    worksheet.getCell("B12").value = "Tên, nhãn hiệu, quy cách,\nphẩm chất";
+
+    worksheet.mergeCells("C12:C13");
+    worksheet.getCell("C12").value = "Mã\nsố";
+
+    worksheet.mergeCells("D12:D13");
+    worksheet.getCell("D12").value = "Đơn\nvị\ntính";
+
+    worksheet.mergeCells("E12:F12");
+    worksheet.getCell("E12").value = "Số lượng";
+    worksheet.getCell("E13").value = "Theo\nchứng từ";
+    worksheet.getCell("F13").value = "Thực\nnhập";
+
+    worksheet.mergeCells("G12:G13");
+    worksheet.getCell("G12").value = "Đơn\ngiá";
+
+    worksheet.mergeCells("H12:H13");
+    worksheet.getCell("H12").value = "Thành\ntiền";
+
+    // Kẻ bảng border và định dạng cho tiêu đề từ hàng 12 đến 13
+    for (let r = 12; r <= 13; r++) {
       for (let c = 1; c <= 8; c++) {
         const cell = worksheet.getCell(r, c);
         cell.font = fontBold;
@@ -157,8 +206,18 @@ export default function DashboardPage() {
       }
     }
 
-    let currentRow = 16;
-    let totalQtyReq = 0;
+    // Hàng 14: Ký hiệu số thứ tự các cột (A, B, C, D, 1, 2, 3, 4) theo mẫu
+    const headersLetters = ["A", "B", "C", "D", "1", "2", "3", "4"];
+    headersLetters.forEach((letter, i) => {
+      const cell = worksheet.getCell(14, i + 1);
+      cell.value = letter;
+      cell.font = fontMain;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = borderThin;
+    });
+
+    // --- 3. ĐỔ DỮ LIỆU SẢN PHẨM (Bắt đầu từ Dòng 15) ---
+    let currentRow = 15;
     let totalAmount = 0;
 
     dataListInput.forEach((item, index) => {
@@ -166,7 +225,6 @@ export default function DashboardPage() {
       const price = Number(item.price) || 150000;
       const amount = qty * price;
 
-      totalQtyReq += qty;
       totalAmount += amount;
 
       worksheet.getCell(`A${currentRow}`).value = index + 1;
@@ -175,27 +233,121 @@ export default function DashboardPage() {
       worksheet.getCell(`C${currentRow}`).value =
         item.sku || item.productId?.sku || "—";
       worksheet.getCell(`D${currentRow}`).value = item.unit || "Cái";
-      worksheet.getCell(`E${currentRow}`).value = qty;
-      worksheet.getCell(`F${currentRow}`).value = qty;
+      worksheet.getCell(`E${currentRow}`).value = qty; // Số lượng theo chứng từ
+      worksheet.getCell(`F${currentRow}`).value = qty; // Số lượng thực nhập
       worksheet.getCell(`G${currentRow}`).value = price;
       worksheet.getCell(`H${currentRow}`).value = amount;
 
+      // Định dạng hiển thị dữ liệu từng dòng
       for (let c = 1; c <= 8; c++) {
         const cell = worksheet.getCell(currentRow, c);
         cell.font = fontMain;
         cell.border = borderThin;
-        if (c === 1 || c === 3 || c === 4)
+        if (c === 1 || c === 3 || c === 4) {
           cell.alignment = { horizontal: "center", vertical: "middle" };
-        if (c === 2)
+        }
+        if (c === 2) {
           cell.alignment = { horizontal: "left", vertical: "middle" };
+        }
         if (c >= 5) {
           cell.alignment = { horizontal: "right", vertical: "middle" };
-          if (c >= 7) cell.numFmt = "#,##0";
+          if (c >= 7) cell.numFmt = "#,##0"; // Format phân tách phần ngàn tiền tệ
         }
       }
       currentRow++;
     });
 
+    // --- 4. HÀNG TỔNG CỘNG VÀ CHỮ KÝ CHÂN TRANG ---
+    // Dòng tổng cộng x hàng
+    worksheet.getCell(`B${currentRow}`).value = "Cộng";
+    worksheet.getCell(`B${currentRow}`).font = fontBold;
+    worksheet.getCell(`B${currentRow}`).alignment = { horizontal: "center" };
+
+    // Kẻ ô gạch x chéo cho các ô mã số, đơn vị ở hàng tổng cộng
+    ["C", "D", "E", "F", "G"].forEach((col) => {
+      worksheet.getCell(`${col}${currentRow}`).value = "x";
+      worksheet.getCell(`${col}${currentRow}`).font = fontMain;
+      worksheet.getCell(`${col}${currentRow}`).alignment = {
+        horizontal: "center",
+      };
+    });
+
+    worksheet.getCell(`H${currentRow}`).value = totalAmount;
+    worksheet.getCell(`H${currentRow}`).font = fontBold;
+    worksheet.getCell(`H${currentRow}`).numFmt = "#,##0";
+
+    // Áp border cho toàn bộ dòng Cộng
+    for (let c = 1; c <= 8; c++) {
+      worksheet.getCell(currentRow, c).border = borderThin;
+    }
+
+    currentRow += 1;
+    // Dòng viết số tiền bằng chữ
+    worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
+    worksheet.getCell(`A${currentRow}`).value =
+      "Tổng số tiền (viết bằng chữ):..................................................................................................................................";
+    worksheet.getCell(`A${currentRow}`).font = fontItalic;
+
+    currentRow += 1;
+    worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
+    worksheet.getCell(`A${currentRow}`).value =
+      "Số chứng từ kèm theo:.........................................................................................................................................";
+    worksheet.getCell(`A${currentRow}`).font = fontMain;
+
+    // Khoảng trống trước khi ký tên và dòng ngày tháng góc phải
+    currentRow += 2;
+    worksheet.mergeCells(`F${currentRow}:H${currentRow}`);
+    worksheet.getCell(
+      `F${currentRow}`
+    ).value = `Ngày ...... tháng ...... năm .......`;
+    worksheet.getCell(`F${currentRow}`).font = fontItalic;
+    worksheet.getCell("F" + currentRow).alignment = { horizontal: "center" };
+
+    currentRow += 1;
+    // Khối các chức danh ký nhận ban ngành
+    worksheet.getCell(`A${currentRow}`).value = "Người lập";
+    worksheet.getCell(`B${currentRow}`).value = "Người giao hàng";
+    worksheet.getCell(`D${currentRow}`).value = "Thủ kho";
+    worksheet.mergeCells(`F${currentRow}:H${currentRow}`);
+    worksheet.getCell(`F${currentRow}`).value =
+      "Kế toán trưởng\n(Hoặc phụ trách bộ phận có nhu cầu nhập)";
+
+    // Định dạng in đậm cho chức danh hàng đầu
+    [
+      `A${currentRow}`,
+      `B${currentRow}`,
+      `D${currentRow}`,
+      `F${currentRow}`,
+    ].forEach((cellKey) => {
+      const cell = worksheet.getCell(cellKey);
+      cell.font = fontBold;
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "top",
+        wrapText: true,
+      };
+    });
+
+    currentRow += 1;
+    // Dòng phụ chú "(Ký, họ tên)"
+    worksheet.getCell(`A${currentRow}`).value = "(Ký, họ tên)";
+    worksheet.getCell(`B${currentRow}`).value = "(Ký, họ tên)";
+    worksheet.getCell(`D${currentRow}`).value = "(Ký, họ tên)";
+    worksheet.mergeCells(`F${currentRow}:H${currentRow}`);
+    worksheet.getCell(`F${currentRow}`).value = "(Ký, họ tên)";
+
+    [
+      `A${currentRow}`,
+      `B${currentRow}`,
+      `D${currentRow}`,
+      `F${currentRow}`,
+    ].forEach((cellKey) => {
+      const cell = worksheet.getCell(cellKey);
+      cell.font = fontItalic;
+      cell.alignment = { horizontal: "center", vertical: "top" };
+    });
+
+    // Xuất file và kích hoạt download tự động trên client browser
     const buffer = await workbook.xlsx.writeBuffer();
     const fileBlob = new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
