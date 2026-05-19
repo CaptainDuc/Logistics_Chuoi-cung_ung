@@ -41,7 +41,7 @@ router.put('/:id', productController.capNhatSanPham);
 
 /**
  * DELETE /api/products/:id
- * Xóa một sản phẩm theo ID.
+ *  Xóa một sản phẩm theo ID.
  * Chỉ tài khoản có role 'Admin' mới được phép thực hiện.
  */
 router.delete('/:id', authorize('Admin'), productController.xoaSanPham);
