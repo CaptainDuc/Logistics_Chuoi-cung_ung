@@ -143,7 +143,7 @@ const refreshToken = async (req, res) => {
     }
 
     // Tạo AccessToken mới.
-    const accessToken = taoAccessToken(user._id, user.role);
+    const accessToken = AccessToken(user._id, user.role);
 
     return res.status(200).json({
       success: true,
