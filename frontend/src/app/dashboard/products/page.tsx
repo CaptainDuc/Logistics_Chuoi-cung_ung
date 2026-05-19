@@ -2,7 +2,13 @@
 
 import React, { useEffect } from "react";
 import ProductQR from "@/components/productQR";
-import { Package, AlertTriangle, LayoutGrid, MapPin } from "lucide-react";
+import {
+  Package,
+  AlertTriangle,
+  LayoutGrid,
+  MapPin,
+  Trash2,
+} from "lucide-react"; // 🔥 ĐỒNG BỘ: Thêm icon Trash2
 import AddProductModal from "@/components/AddProductModal";
 import { useWarehouseStore } from "@/store/useWarehouseStore"; // Import Store của Đức
 
@@ -11,6 +17,8 @@ export default function ProductsPage() {
   const products = useWarehouseStore((state) => state.products);
   const isLoading = useWarehouseStore((state) => state.isLoading);
   const fetchProducts = useWarehouseStore((state) => state.fetchProducts);
+  // @ts-ignore
+  const deleteProduct = useWarehouseStore((state) => state.deleteProduct); // 🔥 ĐỒNG BỘ: Lấy hàm xóa từ Store
 
   // Tự động kích hoạt gọi API lấy dữ liệu thật từ MongoDB Atlas về khi Đức vào trang
   useEffect(() => {
@@ -25,6 +33,21 @@ export default function ProductsPage() {
     loadWarehouseData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 🔥 ĐỒNG BỘ: Hàm xử lý khi người dùng click nút xóa
+  const handleDelete = async (id: string, name: string) => {
+    const confirmDelete = window.confirm(
+      `Đức có chắc chắn muốn xóa sản phẩm "${name}" khỏi kho không?`
+    );
+    if (confirmDelete && deleteProduct) {
+      try {
+        await deleteProduct(id);
+        alert("Xóa sản phẩm thành công!");
+      } catch (err) {
+        alert("Có lỗi xảy ra khi xóa sản phẩm!");
+      }
+    }
+  };
 
   // Nếu Store đang gọi API thì hiển thị hiệu ứng Loading quét xung
   if (isLoading) {
@@ -63,7 +86,7 @@ export default function ProductsPage() {
           return (
             <div
               key={product._id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300/80 transition-all p-5 flex flex-col justify-between space-y-4 animate-in fade-in duration-200"
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300/80 transition-all p-5 flex flex-col justify-between space-y-4 animate-in fade-in duration-200 relative group"
             >
               {/* Phần thông tin phía trên của Thẻ vật tư */}
               <div className="space-y-3">
@@ -71,11 +94,24 @@ export default function ProductsPage() {
                   <span className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-slate-600 block shadow-inner">
                     <Package className="w-5 h-5 text-slate-500" />
                   </span>
-                  {isLowStock && (
-                    <span className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-bold px-2 py-1 rounded-lg">
-                      <AlertTriangle className="w-3 h-3" /> Cần nhập thêm
-                    </span>
-                  )}
+
+                  {/* Khối chứa badge cảnh báo và nút xóa */}
+                  <div className="flex items-center gap-1.5">
+                    {isLowStock && (
+                      <span className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-bold px-2 py-1 rounded-lg">
+                        <AlertTriangle className="w-3 h-3" /> Cần nhập thêm
+                      </span>
+                    )}
+
+                    {/* 🔥 ĐỒNG BỘ: Nút xóa sản phẩm xuất hiện khi hover vào card hoặc luôn hiển thị trên mobile */}
+                    <button
+                      onClick={() => handleDelete(product._id, product.name)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-lg transition-all"
+                      title="Xóa sản phẩm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div>

@@ -117,4 +117,19 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
       });
     }
   },
+  // Thêm vào trong useWarehouseStore nếu chưa có:
+  deleteProduct: async (id: string) => {
+    set({ isLoading: true });
+    try {
+      await axios.delete(`${API_URL}/products/${id}`); // Thay đường dẫn API thật của Đức
+      // Cập nhật lại danh sách sản phẩm ở local sau khi xóa thành công
+      set((state) => ({
+        products: state.products.filter((p) => p._id !== id),
+        isLoading: false,
+      }));
+    } catch (err) {
+      console.error("Lỗi khi xóa sản phẩm:", err);
+      set({ isLoading: false });
+    }
+  },
 }));

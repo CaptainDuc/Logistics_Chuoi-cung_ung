@@ -12,16 +12,6 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
 
-<<<<<<< HEAD
-  // Gọi các trạng thái đóng mở sidebar, tên admin và hàm xóa store (nếu có) từ Zustand store ra dùng
-  // Thêm clearStore từ useAdminStore để xóa sạch dữ liệu khi đăng xuất
-  const { isSidebarOpen, toggleSidebar, adminName, clearStore } =
-    useAdminStore() as any;
-
-  // Hàm xử lý Đăng xuất đồng bộ hệ thống
-  const handleLogout = () => {
-    // 1. Xóa thông tin trạng thái user trong Zustand Store (nếu Đức có viết hàm xóa)
-=======
   // Gọi các trạng thái đóng mở sidebar, tên admin, chức vụ và hàm xóa store từ Zustand
   const { isSidebarOpen, toggleSidebar, adminName, adminRole, clearStore } =
     useAdminStore();
@@ -29,7 +19,6 @@ export default function DashboardLayout({
   // Hàm xử lý Đăng xuất đồng bộ hệ thống
   const handleLogout = () => {
     // 1. Xóa thông tin trạng thái user trong Zustand Store
->>>>>>> aea97c3c (Them action cho san pham)
     if (clearStore) {
       clearStore();
     }
