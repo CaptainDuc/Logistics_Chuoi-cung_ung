@@ -33,7 +33,7 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
   const toast = useToastStore((s) => s.show);
 
   // ✅ ĐÚNG: Tính toán danh sách vị trí đã bận dựa trên dữ liệu state mới nhất của store
-  const busyLocations = (products as any[])
+  const busyLocations = products
     .filter((p) => (Number(p.quantity) || 0) > 0)
     .map((p) => p.location?.trim());
 

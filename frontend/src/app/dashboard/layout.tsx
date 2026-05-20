@@ -163,7 +163,9 @@ export default function DashboardLayout({
             </span>
           </div>
         </header>
-        <main className="flex-1 p-6 max-w-1600 w-full mx-auto">{children}</main>
+        <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

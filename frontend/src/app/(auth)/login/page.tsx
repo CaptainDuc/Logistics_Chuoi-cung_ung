@@ -9,6 +9,7 @@ import { User, Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useToastStore } from "@/store/useToastStore";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 const loginSchema = z.object({
   username: z.string().min(3, { message: "Tên đăng nhập ít nhất 3 ký tự" }),
@@ -68,11 +69,10 @@ export default function LoginPage() {
 
       toast("Đăng nhập thành công.", "success");
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Lỗi đăng nhập:", error);
       setLoginError(
-        error?.response?.data?.message ||
-          "Đăng nhập thất bại, vui lòng thử lại."
+        getApiErrorMessage(error, "Đăng nhập thất bại, vui lòng thử lại.")
       );
     }
   };

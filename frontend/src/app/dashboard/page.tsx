@@ -3,11 +3,9 @@
 
 import React, { useEffect } from "react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
-import { Download } from "lucide-react";
+import { useAdminStore } from "@/store/useAdminStore";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-
-const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
 
 export default function DashboardPage() {
   const {

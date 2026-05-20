@@ -15,13 +15,12 @@ import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
 import { getFetchErrorMessage } from "@/lib/apiError";
 import { isAdminUser } from "@/lib/authRole";
+import { useAdminStore } from "@/store/useAdminStore";
 
-// Giả định hoặc Đức dùng store admin thực tế của Đức
-const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function OutboundPage() {
-  const { adminName } = useAdminStore(); // Lấy adminName người lập phiếu
+  const { adminName } = useAdminStore();
 
   // 🔥 ĐỒNG BỘ HOÀN TOÀN: Gọi đúng các state và hàm từ file useWarehouseStore của Đức
   const {
@@ -87,7 +86,9 @@ export default function OutboundPage() {
     // Sửa lỗi gạch đỏ: So sánh với p.quantity thay vì p.qty cũ
     if (selectedProduct && formData.qty > (selectedProduct.quantity || 0)) {
       toast(
-        `Số lượng xuất (${formData.qty}) vượt quá tồn kho hiện có (${selectedProduct.quantity || 0}).`,
+        `Số lượng xuất (${formData.qty}) vượt quá tồn kho hiện có (${
+          selectedProduct.quantity || 0
+        }).`,
         "error"
       );
       return;

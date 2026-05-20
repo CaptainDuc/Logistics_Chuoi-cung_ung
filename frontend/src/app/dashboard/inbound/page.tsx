@@ -11,13 +11,12 @@ import {
   FileSpreadsheet,
   Loader2,
 } from "lucide-react";
-import { useWarehouseStore } from "@/store/useWarehouseStore"; // Tích hợp đúng Store của Đức
+import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
 import { getFetchErrorMessage } from "@/lib/apiError";
 import { isAdminUser } from "@/lib/authRole";
+import { useAdminStore } from "@/store/useAdminStore";
 
-// Hàm giả định lấy tên admin để hiển thị người lập phiếu
-const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function InboundPage() {
@@ -394,32 +393,32 @@ export default function InboundPage() {
 
               {/* Footer Modal Actions */}
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
-              <button
-                type="button"
-                onClick={() => !isSubmitting && setIsModalOpen(false)}
-                disabled={isSubmitting}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all disabled:opacity-50"
-              >
-                <X className="w-4 h-4" /> Hủy bỏ
-              </button>
-              <button
-                type="submit"
-                disabled={safeProducts.length === 0 || isSubmitting}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
-                  safeProducts.length === 0 || isSubmitting
-                    ? "bg-slate-300 cursor-not-allowed shadow-none"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                <span>
-                  {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => !isSubmitting && setIsModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" /> Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={safeProducts.length === 0 || isSubmitting}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
+                    safeProducts.length === 0 || isSubmitting
+                      ? "bg-slate-300 cursor-not-allowed shadow-none"
+                      : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
+                  </span>
+                </button>
               </div>
             </form>
           </div>
