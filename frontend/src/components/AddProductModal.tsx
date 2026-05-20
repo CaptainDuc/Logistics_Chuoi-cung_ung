@@ -1,6 +1,7 @@
 "use client";
 
 import { useWarehouseStore } from "@/store/useWarehouseStore";
+import { useToastStore } from "@/store/useToastStore";
 import React, { useState } from "react";
 import {
   Plus,
@@ -28,8 +29,8 @@ const STORAGE_LOCATIONS = [
 ];
 
 export default function AddProductModal({ onSuccess }: AddProductModalProps) {
-  // ✅ ĐÚNG: Đưa việc lấy dữ liệu từ Zustand Store vào trong Component body
   const { products, addProduct } = useWarehouseStore();
+  const toast = useToastStore((s) => s.show);
 
   // ✅ ĐÚNG: Tính toán danh sách vị trí đã bận dựa trên dữ liệu state mới nhất của store
   const busyLocations = (products as any[])
@@ -62,13 +63,13 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !sku || !location) {
-      alert("Đức vui lòng điền đầy đủ thông tin nha!");
+      toast("Vui lòng điền đầy đủ thông tin.", "error");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addProduct({
+      const result = await addProduct({
         sku,
         name,
         location,
@@ -76,6 +77,11 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
         minQuantity,
         supplierId: null,
       });
+
+      if (!result.ok) {
+        toast(result.message, "error");
+        return;
+      }
 
       setName("");
       // Cập nhật lại vị trí mặc định sau khi reset form
@@ -86,12 +92,10 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
 
       if (onSuccess) onSuccess();
 
-      alert(
-        "Khởi tạo đầu mục sản phẩm thành công trên hệ thống MongoDB Atlas!"
-      );
+      toast("Đã thêm sản phẩm thành công.", "success");
     } catch (error) {
       console.error("Lỗi khi thêm sản phẩm:", error);
-      alert("Đã xảy ra lỗi khi lưu sản phẩm!");
+      toast("Không thể lưu sản phẩm. Vui lòng thử lại.", "error");
     } finally {
       setIsSubmitting(false);
     }

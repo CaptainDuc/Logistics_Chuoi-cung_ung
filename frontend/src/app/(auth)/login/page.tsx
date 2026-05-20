@@ -5,21 +5,23 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { useToastStore } from "@/store/useToastStore";
 
 const loginSchema = z.object({
   username: z.string().min(3, { message: "Tên đăng nhập ít nhất 3 ký tự" }),
   password: z.string().min(6, { message: "Mật khẩu ít nhất 6 ký tự" }),
 });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const toast = useToastStore((s) => s.show);
   const [showPassword, setShowPassword] = React.useState(false);
   const [loginError, setLoginError] = React.useState<string | null>(null);
 
@@ -36,8 +38,7 @@ export default function LoginPage() {
     e: React.ChangeEvent<HTMLInputElement>,
     fieldName: "username" | "password"
   ) => {
-    const input = e.target;
-    const rawValue = input.value;
+    const rawValue = e.target.value;
     if (/\s/.test(rawValue)) {
       setValue(fieldName, rawValue.replace(/\s/g, ""), {
         shouldValidate: true,
@@ -47,30 +48,32 @@ export default function LoginPage() {
     }
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: LoginFormValues) => {
+    setLoginError(null);
     try {
       const response = await axios.post(`${API_URL}/auth/login`, data);
 
-      console.log("LOGIN RESPONSE:", JSON.stringify(response.data, null, 2));
-
-      // lấy token từ backend
       const token = response.data.data.accessToken;
+      const refreshToken = response.data.data.refreshToken;
       const user = response.data.data.user;
-      // lưu token
+
       localStorage.setItem("token", token);
       localStorage.setItem("accessToken", token);
+      localStorage.setItem("refreshToken", refreshToken);
       document.cookie = `token=${token}; path=/`;
-      // lưu user nếu có
+
       localStorage.setItem("user", JSON.stringify(user));
-
       localStorage.setItem("userRole", user?.role || "");
-      localStorage.setItem("userName", user?.name || "");
+      localStorage.setItem("userName", user?.username || "");
 
-      console.log("TOKEN:", token);
-      // chuyển trang
+      toast("Đăng nhập thành công.", "success");
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Lỗi đăng nhập:", error);
+      setLoginError(
+        error?.response?.data?.message ||
+          "Đăng nhập thất bại, vui lòng thử lại."
+      );
     }
   };
 
@@ -137,19 +140,6 @@ export default function LoginPage() {
               {errors.password.message}
             </p>
           )}
-
-          <div className="flex justify-between text-sm mt-2 mb-4 px-1">
-            <label className="flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="accent-white mr-2 w-4 h-4 bg-transparent"
-              />
-              Remember me
-            </label>
-            <a href="#" className="hover:underline">
-              Forgot password?
-            </a>
-          </div>
 
           <button
             type="submit"

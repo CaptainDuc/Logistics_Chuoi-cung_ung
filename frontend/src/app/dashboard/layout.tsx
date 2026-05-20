@@ -5,17 +5,16 @@ import { useAdminStore } from "@/store/useAdminStore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
-
-  // Gọi các trạng thái đóng mở sidebar, tên admin, chức vụ và hàm xóa store từ Zustand
   const { isSidebarOpen, toggleSidebar, adminName, adminRole, clearStore } =
     useAdminStore();
-
   const loadUserFromStorage = useAdminStore(
     (state) => state.loadUserFromStorage
   );
@@ -23,31 +22,43 @@ export default function DashboardLayout({
   useEffect(() => {
     loadUserFromStorage();
   }, []);
-  // Hàm xử lý Đăng xuất đồng bộ hệ thống
-  const handleLogout = () => {
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+
+    try {
+      if (token) {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Logout API failed:", error);
+    }
+
     localStorage.removeItem("token");
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     localStorage.removeItem("userRole");
     localStorage.removeItem("userName");
-
     document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
     clearStore();
-
     router.push("/login");
   };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex">
-      {/* 1. THANH SIDEBAR MENU BÊN TRÁI - CO GIÃN THEO TRẠNG THÁI */}
       <aside
         className={`bg-slate-900 text-white min-h-screen transition-all duration-300 flex flex-col fixed left-0 top-0 z-50 justify-between ${
           isSidebarOpen ? "w-64" : "w-20"
         }`}
       >
         <div>
-          {/* LOGO HỆ THỐNG */}
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
             {isSidebarOpen ? (
               <span className="font-bold text-lg text-emerald-400 tracking-wider">
@@ -60,7 +71,6 @@ export default function DashboardLayout({
             )}
           </div>
 
-          {/* CÁC NÚT ĐIỀU HƯỚNG MENU TỚI CÁC TAB */}
           <nav className="p-4 space-y-2 overflow-y-auto">
             <Link
               href="/dashboard"
@@ -73,7 +83,6 @@ export default function DashboardLayout({
                 <span className="font-medium text-sm">Tổng quan Dashboard</span>
               )}
             </Link>
-
             <Link
               href="/dashboard/products"
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition-colors group"
@@ -85,7 +94,6 @@ export default function DashboardLayout({
                 <span className="font-medium text-sm">Quản lý sản phẩm</span>
               )}
             </Link>
-
             <Link
               href="/dashboard/inbound"
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition-colors group"
@@ -97,7 +105,6 @@ export default function DashboardLayout({
                 <span className="font-medium text-sm">Quản lý nhập kho</span>
               )}
             </Link>
-
             <Link
               href="/dashboard/outbound"
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition-colors group"
@@ -112,9 +119,7 @@ export default function DashboardLayout({
           </nav>
         </div>
 
-        {/* PHẦN DƯỚI CÙNG SIDEBAR: GỒM NÚT LOGOUT VÀ THÔNG TIN PHIÊN BẢN */}
         <div className="flex flex-col space-y-2">
-          {/* NÚT BẤM ĐĂNG XUẤT HỆ THỐNG */}
           <div className="px-4">
             <button
               onClick={handleLogout}
@@ -129,45 +134,35 @@ export default function DashboardLayout({
               {isSidebarOpen && <span>Đăng xuất</span>}
             </button>
           </div>
-
-          {/* THÔNG TIN BẢN QUYỀN HOẶC PHIÊN BẢN */}
           <div className="p-4 border-t border-slate-800 text-center text-xs text-slate-500">
             {isSidebarOpen ? <p>© 2026 Smart WMS</p> : <p>v1</p>}
           </div>
         </div>
       </aside>
 
-      {/* 2. KHU VỰC CHỨA NỘI DUNG LỚN BÊN PHẢI (NAVBAR + MAIN CONTENT) */}
       <div
         className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${
           isSidebarOpen ? "pl-64" : "pl-20"
         }`}
       >
-        {/* THANH NAVBAR PHÍA TRÊN CỐ ĐỊNH */}
         <header className="h-16 bg-white shadow-sm border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-40">
-          {/* Nút bấm ẩn/hiện Sidebar nhanh */}
           <button
             onClick={toggleSidebar}
             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors focus:outline-none"
           >
             {isSidebarOpen ? "◀" : "▶"}
           </button>
-
-          {/* Avatar và thông tin Chức vụ + Tên động từ Zustand */}
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold shadow-sm">
               {adminName ? adminName.charAt(0).toUpperCase() : "A"}
             </div>
             <span className="font-semibold text-sm text-slate-700 hidden sm:inline-block">
-              {/* Kết hợp định dạng mong muốn: Chức vụ + Tên đầy đủ */}
               {adminRole && adminName
                 ? `${adminRole} ${adminName}`
                 : "Người dùng"}
             </span>
           </div>
         </header>
-
-        {/* NƠI HIỂN THỊ CHẠY RUỘT CỦA CÁC TRANG CON VÀO ĐÂY */}
         <main className="flex-1 p-6 max-w-1600 w-full mx-auto">{children}</main>
       </div>
     </div>

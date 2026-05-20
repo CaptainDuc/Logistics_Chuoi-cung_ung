@@ -4,7 +4,6 @@ interface AdminState {
   isSidebarOpen: boolean;
   adminName: string;
   adminRole: string;
-
   toggleSidebar: () => void;
   loadUserFromStorage: () => void;
   clearStore: () => void;
@@ -12,7 +11,6 @@ interface AdminState {
 
 export const useAdminStore = create<AdminState>((set) => ({
   isSidebarOpen: true,
-
   adminName: "",
   adminRole: "",
 
@@ -23,9 +21,23 @@ export const useAdminStore = create<AdminState>((set) => ({
 
   loadUserFromStorage: () => {
     if (typeof window !== "undefined") {
-      const name = localStorage.getItem("userName") || "Người dùng";
+      const userRaw = localStorage.getItem("user");
+      let parsedUser: { username?: string; role?: string } | null = null;
 
-      const role = localStorage.getItem("userRole") || "Staff";
+      if (userRaw) {
+        try {
+          parsedUser = JSON.parse(userRaw);
+        } catch {
+          parsedUser = null;
+        }
+      }
+
+      const name =
+        localStorage.getItem("userName") ||
+        parsedUser?.username ||
+        "Người dùng";
+      const role =
+        localStorage.getItem("userRole") || parsedUser?.role || "User";
 
       set({
         adminName: name,

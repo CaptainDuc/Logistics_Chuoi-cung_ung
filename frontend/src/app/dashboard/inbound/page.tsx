@@ -7,15 +7,18 @@ import {
   Check,
   X,
   ClipboardCheck,
-  User,
-  Calendar,
   FileText,
   FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore"; // Tích hợp đúng Store của Đức
+import { useToastStore } from "@/store/useToastStore";
+import { getFetchErrorMessage } from "@/lib/apiError";
+import { isAdminUser } from "@/lib/authRole";
 
 // Hàm giả định lấy tên admin để hiển thị người lập phiếu
 const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function InboundPage() {
   const { adminName } = useAdminStore();
@@ -46,12 +49,26 @@ export default function InboundPage() {
     note: "",
   });
 
+  const toast = useToastStore((s) => s.show);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(isAdminUser());
+  }, []);
+
   const handleExportInboundExcel = async () => {
+    if (!isAdmin) {
+      toast("Chỉ tài khoản Admin mới được xuất Excel.", "error");
+      return;
+    }
+    setIsExporting(true);
     try {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        "http://localhost:5000/api/inventory/export-excel?type=Import",
+        `${API_URL}/inventory/export-excel?type=Import`,
         {
           method: "GET",
           headers: {
@@ -61,7 +78,11 @@ export default function InboundPage() {
       );
 
       if (!response.ok) {
-        throw new Error("Không thể xuất Excel nhập kho");
+        const msg = await getFetchErrorMessage(
+          response,
+          "Không thể xuất Excel nhập kho."
+        );
+        throw new Error(msg);
       }
 
       const blob = await response.blob();
@@ -81,10 +102,16 @@ export default function InboundPage() {
       a.remove();
 
       window.URL.revokeObjectURL(url);
+      toast("Đã tải file Excel nhập kho.", "success");
     } catch (err) {
       console.error(err);
 
-      alert("Xuất Excel nhập kho thất bại!");
+      toast(
+        err instanceof Error ? err.message : "Xuất Excel nhập kho thất bại!",
+        "error"
+      );
+    } finally {
+      setIsExporting(false);
     }
   }; // Lọc an toàn danh sách sản phẩm hiển thị trên bảng để xem trạng thái
   // Khi mở modal, tự động chọn sản phẩm đầu tiên trong danh bãi kho (nếu có)
@@ -109,23 +136,23 @@ export default function InboundPage() {
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.productSku) {
-      alert("Đức vui lòng chọn một sản phẩm để nhập kho nhé!");
+      toast("Vui lòng chọn một sản phẩm để nhập kho.", "error");
       return;
     }
 
-    try {
-      // 🔥 Gọi hàm xử lý giao dịch thực tế trong Store của Đức: truyền đúng productId, type: 'Import', quantity
-      await addInventoryTransaction({
-        sku: formData.productSku,
-        type: "Import",
-        quantity: formData.qty,
-      });
+    setIsSubmitting(true);
+    const result = await addInventoryTransaction({
+      sku: formData.productSku,
+      type: "Import",
+      quantity: formData.qty,
+    });
+    setIsSubmitting(false);
 
-      alert("Khởi tạo giao dịch nhập kho thành công trên hệ thống!");
+    if (result.ok) {
+      toast("Nhập kho thành công.", "success");
       setIsModalOpen(false);
-    } catch (error) {
-      console.error("Lỗi khi lập phiếu nhập kho:", error);
-      alert("Lập phiếu nhập kho thất bại!");
+    } else {
+      toast(result.message, "error");
     }
   };
 
@@ -167,13 +194,28 @@ export default function InboundPage() {
 
         {/* Nút Tạo phiếu nhập */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleExportInboundExcel}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Xuất Excel Nhập Kho
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={handleExportInboundExcel}
+              disabled={isExporting}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:pointer-events-none text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              {isExporting ? "Đang xuất..." : "Xuất Excel Nhập Kho"}
+            </button>
+          ) : (
+            <span
+              className="text-xs text-slate-400 max-w-[180px] leading-snug"
+              title="Chỉ Admin mới xuất Excel."
+            >
+              Xuất Excel: cần quyền Admin
+            </span>
+          )}
 
           <button
             onClick={handleOpenModal}
@@ -352,25 +394,32 @@ export default function InboundPage() {
 
               {/* Footer Modal Actions */}
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
-                >
-                  <X className="w-4 h-4" /> Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={safeProducts.length === 0}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
-                    safeProducts.length === 0
-                      ? "bg-slate-300 cursor-not-allowed shadow-none"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
-                >
+              <button
+                type="button"
+                onClick={() => !isSubmitting && setIsModalOpen(false)}
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all disabled:opacity-50"
+              >
+                <X className="w-4 h-4" /> Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                disabled={safeProducts.length === 0 || isSubmitting}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
+                  safeProducts.length === 0 || isSubmitting
+                    ? "bg-slate-300 cursor-not-allowed shadow-none"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
                   <Check className="w-4 h-4" />
-                  <span>Xác nhận nhập kho</span>
-                </button>
+                )}
+                <span>
+                  {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
+                </span>
+              </button>
               </div>
             </form>
           </div>

@@ -7,16 +7,18 @@ import {
   Check,
   X,
   ClipboardX,
-  User,
-  Calendar,
   FileText,
-  Building2,
   FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
+import { useToastStore } from "@/store/useToastStore";
+import { getFetchErrorMessage } from "@/lib/apiError";
+import { isAdminUser } from "@/lib/authRole";
 
 // Giả định hoặc Đức dùng store admin thực tế của Đức
 const useAdminStore = () => ({ adminName: "Trần Minh Đức" });
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function OutboundPage() {
   const { adminName } = useAdminStore(); // Lấy adminName người lập phiếu
@@ -44,6 +46,15 @@ export default function OutboundPage() {
     customerName: "",
   });
 
+  const toast = useToastStore((s) => s.show);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(isAdminUser());
+  }, []);
+
   // Tự động chọn sản phẩm đầu tiên khi mở modal xuất kho
   const handleOpenModal = () => {
     if (products && products.length > 0) {
@@ -66,7 +77,7 @@ export default function OutboundPage() {
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.productSku) {
-      alert("Đức vui lòng chọn một sản phẩm để xuất kho nhé!");
+      toast("Vui lòng chọn một sản phẩm để xuất kho.", "error");
       return;
     }
 
@@ -75,38 +86,40 @@ export default function OutboundPage() {
 
     // Sửa lỗi gạch đỏ: So sánh với p.quantity thay vì p.qty cũ
     if (selectedProduct && formData.qty > (selectedProduct.quantity || 0)) {
-      alert(
-        `Lỗi: Số lượng xuất (${
-          formData.qty
-        }) vượt quá số lượng tồn kho thực tế hiện có (${
-          selectedProduct.quantity || 0
-        })!`
+      toast(
+        `Số lượng xuất (${formData.qty}) vượt quá tồn kho hiện có (${selectedProduct.quantity || 0}).`,
+        "error"
       );
       return;
     }
 
-    try {
-      // 🔥 Gọi hàm xử lý giao dịch thực tế: truyền đúng productId, type: 'Export', quantity
-      await addInventoryTransaction({
-        sku: formData.productSku,
-        type: "Export",
-        quantity: formData.qty,
-      });
+    setIsSubmitting(true);
+    const result = await addInventoryTransaction({
+      sku: formData.productSku,
+      type: "Export",
+      quantity: formData.qty,
+    });
+    setIsSubmitting(false);
 
-      alert("Khởi tạo giao dịch xuất kho thành công trên hệ thống!");
+    if (result.ok) {
+      toast("Xuất kho thành công.", "success");
       setIsModalOpen(false);
-    } catch (error) {
-      console.error("Lỗi khi lập phiếu xuất kho:", error);
-      alert("Lập phiếu xuất kho thất bại!");
+    } else {
+      toast(result.message, "error");
     }
   };
 
   const handleExportOutboundExcel = async () => {
+    if (!isAdmin) {
+      toast("Chỉ tài khoản Admin mới được xuất Excel.", "error");
+      return;
+    }
+    setIsExporting(true);
     try {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        "http://localhost:5000/api/inventory/export-excel?type=Export",
+        `${API_URL}/inventory/export-excel?type=Export`,
         {
           method: "GET",
           headers: {
@@ -116,7 +129,11 @@ export default function OutboundPage() {
       );
 
       if (!response.ok) {
-        throw new Error("Không thể xuất Excel");
+        const msg = await getFetchErrorMessage(
+          response,
+          "Không thể xuất Excel xuất kho."
+        );
+        throw new Error(msg);
       }
 
       const blob = await response.blob();
@@ -136,10 +153,16 @@ export default function OutboundPage() {
       a.remove();
 
       window.URL.revokeObjectURL(url);
+      toast("Đã tải file Excel xuất kho.", "success");
     } catch (err) {
       console.error(err);
 
-      alert("Xuất Excel xuất kho thất bại!");
+      toast(
+        err instanceof Error ? err.message : "Xuất Excel xuất kho thất bại!",
+        "error"
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
   // Lọc an toàn danh sách sản phẩm hiển thị trên bảng
@@ -181,13 +204,28 @@ export default function OutboundPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleExportOutboundExcel}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Xuất Excel Xuất Kho
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={handleExportOutboundExcel}
+              disabled={isExporting}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:pointer-events-none text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              {isExporting ? "Đang xuất..." : "Xuất Excel Xuất Kho"}
+            </button>
+          ) : (
+            <span
+              className="text-xs text-slate-400 max-w-[180px] leading-snug"
+              title="Chỉ Admin mới xuất Excel."
+            >
+              Xuất Excel: cần quyền Admin
+            </span>
+          )}
 
           <button
             onClick={handleOpenModal}
@@ -364,22 +402,29 @@ export default function OutboundPage() {
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
+                  onClick={() => !isSubmitting && setIsModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all disabled:opacity-50"
                 >
                   <X className="w-4 h-4" /> Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  disabled={safeProducts.length === 0}
+                  disabled={safeProducts.length === 0 || isSubmitting}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
-                    safeProducts.length === 0
+                    safeProducts.length === 0 || isSubmitting
                       ? "bg-slate-300 cursor-not-allowed shadow-none"
                       : "bg-rose-600 hover:bg-rose-700"
                   }`}
                 >
-                  <Check className="w-4 h-4" />
-                  <span>Xác nhận xuất kho</span>
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isSubmitting ? "Đang xử lý..." : "Xác nhận xuất kho"}
+                  </span>
                 </button>
               </div>
             </form>
