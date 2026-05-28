@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LogiChain - Quản lý kho và quét QR",
-  description: "Giao diện quản lý kho và quét QR chuyên nghiệp dành cho nhân viên logistics.",
+  title: "Smart WMS",
+  description: "Warehouse Management System",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="vi">
       <body>{children}</body>

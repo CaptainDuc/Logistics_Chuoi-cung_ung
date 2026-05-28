@@ -1,54 +1,19 @@
-﻿@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  color-scheme: light;
-}
-
-html {
-  min-height: 100%;
-  background: linear-gradient(135deg, #f0f4ff 0%, #fff5f0 50%, #f0fdf4 100%);
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: "Inter", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: linear-gradient(135deg, #f0f4ff 0%, #fff5f0 50%, #f0fdf4 100%);
-  color: #1a202c;
-}
+﻿@import "tailwindcss";
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-button, input, textarea, select {
-  font: inherit;
+html,
+body {
+  width: 100%;
+  min-height: 100%;
 }
 
-/* Smooth gradients */
-.gradient-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.gradient-success {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.gradient-warning {
-  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-}
-
-.gradient-info {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-/* Shadow effects */
-.shadow-card {
-  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.1);
-}
-
-.shadow-hover {
-  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.15);
+body {
+  background: #0a0f1e;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
 }
