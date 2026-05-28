@@ -258,5 +258,5 @@ async function chaySeedDuLieu() {
 }
 
 if (require.main === module) {
-  熱chaySeedDuLieu();
+  chaySeedDuLieu();
 }
