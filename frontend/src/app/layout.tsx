@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kiểm kho QR - Mobile",
-  description: "Giao diện quét QR code cho hệ thống kiểm kho thông minh.",
+  title: "LogiChain - Quản lý kho và quét QR",
+  description: "Giao diện quản lý kho và quét QR chuyên nghiệp dành cho nhân viên logistics.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
