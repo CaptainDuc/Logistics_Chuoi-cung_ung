@@ -6,10 +6,15 @@ import {
   Search,
   Check,
   X,
-  ClipboardCheck,
+  PackageCheck,
   FileText,
   FileSpreadsheet,
   Loader2,
+  MapPin,
+  Hash,
+  ArrowDownToLine,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
@@ -21,33 +26,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function InboundPage() {
   const { adminName } = useAdminStore();
+  const { products, isLoading, fetchProducts, addInventoryTransaction } = useWarehouseStore();
 
-  // 🔥 ĐỒNG BỘ HOÀN TOÀN: Gọi chuẩn isLoading và fetchProducts từ Store của Đức gửi
-  const {
-    products,
-    isLoading,
-    fetchProducts,
-    addInventoryTransaction, // Dùng hàm xử lý nhập/xuất kho thực tế của Store
-  } = useWarehouseStore();
-
-  // Khởi tạo và nạp dữ liệu danh mục hàng hóa từ MongoDB về khi load trang
   useEffect(() => {
-    if (fetchProducts) {
-      fetchProducts();
-    }
+    if (fetchProducts) fetchProducts();
   }, []);
 
-  // State quản lý tìm kiếm phiếu nhập
   const [searchTerm, setSearchTerm] = useState("");
-
-  // State quản lý Đóng/Mở Modal và Form lập phiếu
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    productSku: "",
-    qty: 1,
-    note: "",
-  });
-
+  const [formData, setFormData] = useState({ productSku: "", qty: 1, note: "" });
   const toast = useToastStore((s) => s.show);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -65,65 +52,36 @@ export default function InboundPage() {
     setIsExporting(true);
     try {
       const token = localStorage.getItem("token");
-
-      const response = await fetch(
-        `${API_URL}/inventory/export-excel?type=Import`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
+      const response = await fetch(`${API_URL}/inventory/export-excel?type=Import`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) {
-        const msg = await getFetchErrorMessage(
-          response,
-          "Không thể xuất Excel nhập kho."
-        );
+        const msg = await getFetchErrorMessage(response, "Không thể xuất Excel nhập kho.");
         throw new Error(msg);
       }
-
       const blob = await response.blob();
-
       const url = window.URL.createObjectURL(blob);
-
       const a = document.createElement("a");
-
       a.href = url;
-
       a.download = "bao-cao-nhap-kho.xlsx";
-
       document.body.appendChild(a);
-
       a.click();
-
       a.remove();
-
       window.URL.revokeObjectURL(url);
       toast("Đã tải file Excel nhập kho.", "success");
     } catch (err) {
-      console.error(err);
-
-      toast(
-        err instanceof Error ? err.message : "Xuất Excel nhập kho thất bại!",
-        "error"
-      );
+      toast(err instanceof Error ? err.message : "Xuất Excel nhập kho thất bại!", "error");
     } finally {
       setIsExporting(false);
     }
-  }; // Lọc an toàn danh sách sản phẩm hiển thị trên bảng để xem trạng thái
-  // Khi mở modal, tự động chọn sản phẩm đầu tiên trong danh bãi kho (nếu có)
+  };
+
   const handleOpenModal = () => {
     if (products && products.length > 0) {
       const firstProduct = products[0];
-
       if (firstProduct) {
-        setFormData({
-          productSku: firstProduct.sku || "",
-          qty: 1,
-          note: "",
-        });
+        setFormData({ productSku: firstProduct.sku || "", qty: 1, note: "" });
       }
     } else {
       setFormData({ productSku: "", qty: 1, note: "" });
@@ -131,14 +89,12 @@ export default function InboundPage() {
     setIsModalOpen(true);
   };
 
-  // Xử lý hành động nhấn tạo phiếu nhập kho bổ sung
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.productSku) {
       toast("Vui lòng chọn một sản phẩm để nhập kho.", "error");
       return;
     }
-
     setIsSubmitting(true);
     const result = await addInventoryTransaction({
       sku: formData.productSku,
@@ -146,7 +102,6 @@ export default function InboundPage() {
       quantity: formData.qty,
     });
     setIsSubmitting(false);
-
     if (result.ok) {
       toast("Nhập kho thành công.", "success");
       setIsModalOpen(false);
@@ -163,133 +118,186 @@ export default function InboundPage() {
       (product.location || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🔥 Đồng bộ trạng thái chờ phản hồi dữ liệu theo biến 'isLoading' từ Store Đức gửi
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 text-sm font-medium animate-pulse">
-            Đang tải dữ liệu bãi kho thực tế từ MongoDB...
-          </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 48, height: 48,
+              border: "3px solid rgba(99,102,241,0.15)",
+              borderTopColor: "#6366f1",
+              borderRadius: "50%",
+              margin: "0 auto 16px",
+            }}
+            className="spinner"
+          />
+          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Đang tải dữ liệu kho hàng...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto font-['Poppins',_sans-serif] text-slate-800 bg-white min-h-screen">
-      {/* Tiêu đề trang */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div className="page-container">
+      {/* ===== PAGE HEADER ===== */}
+      <div className="section-header">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-slate-900">
-            <ClipboardCheck className="w-6 h-6 text-indigo-600" /> Quản Lý Nhập
-            Kho (Inbound)
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Lập phiếu nhập kho thực tế và quản lý cập nhật số lượng tồn kho.
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <div
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: "linear-gradient(135deg, #d97706, #f59e0b)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 16px rgba(245,158,11,0.3)",
+              }}
+            >
+              <PackageCheck size={18} color="#fff" />
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+              Quản lý Nhập Kho
+            </h1>
+          </div>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", paddingLeft: 2 }}>
+            Lập phiếu nhập kho và cập nhật số lượng tồn kho thực tế.
           </p>
         </div>
 
-        {/* Nút Tạo phiếu nhập */}
-        <div className="flex items-center gap-3">
-          {isAdmin ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {isAdmin && (
             <button
-              type="button"
+              className="btn btn-emerald"
               onClick={handleExportInboundExcel}
               disabled={isExporting}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:pointer-events-none text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
             >
-              {isExporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-4 h-4" />
-              )}
-              {isExporting ? "Đang xuất..." : "Xuất Excel Nhập Kho"}
+              {isExporting ? <Loader2 size={14} className="spinner" /> : <FileSpreadsheet size={14} />}
+              {isExporting ? "Đang xuất..." : "Xuất Excel"}
             </button>
-          ) : (
-            <span
-              className="text-xs text-slate-400 max-w-[180px] leading-snug"
-              title="Chỉ Admin mới xuất Excel."
-            >
-              Xuất Excel: cần quyền Admin
-            </span>
           )}
-
           <button
+            className="btn btn-primary"
+            style={{ background: "linear-gradient(135deg, #d97706, #f59e0b)", boxShadow: "0 4px 16px rgba(245,158,11,0.3)" }}
             onClick={handleOpenModal}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md active:scale-95 text-sm"
           >
-            <Plus className="w-4 h-4" />
+            <Plus size={15} />
             Tạo phiếu nhập kho
           </button>
         </div>
       </div>
 
-      {/* Thanh Tìm Kiếm */}
-      <div className="mb-6 relative max-w-md">
+      {/* ===== SEARCH ===== */}
+      <div className="search-bar" style={{ marginBottom: 20, maxWidth: 400 }}>
+        <Search size={15} className="search-icon" />
         <input
+          className="form-input"
+          style={{ paddingLeft: 38 }}
           type="text"
-          placeholder="Tìm sản phẩm theo mã SKU hoặc tên hàng..."
+          placeholder="Tìm sản phẩm theo SKU, tên, vị trí..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all"
         />
-        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
       </div>
 
-      {/* Bảng Hiển Thị Trạng Thái Nhập/Tồn của Các Sản Phẩm */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+      {/* ===== TABLE ===== */}
+      <div
+        className="animate-fade-up"
+        style={{
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-default)",
+          borderRadius: 16,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table className="data-table">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="px-6 py-4">Mã Vật Tư (SKU)</th>
-                <th className="px-6 py-4">Tên Sản Phẩm</th>
-                <th className="px-6 py-4">Vị Trí Kệ</th>
-                <th className="px-6 py-4 text-right">Số Lượng Tồn Hiện Tại</th>
-                <th className="px-6 py-4">Trạng Thái</th>
+              <tr>
+                <th>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Hash size={11} />Mã SKU
+                  </span>
+                </th>
+                <th>Tên sản phẩm</th>
+                <th>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <MapPin size={11} />Vị trí kệ
+                  </span>
+                </th>
+                <th style={{ textAlign: "right" }}>Số lượng tồn</th>
+                <th>Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
+            <tbody>
               {filteredProducts.length > 0 ? (
-                filteredProducts.map((product) => (
-                  <tr
-                    key={product._id}
-                    className="hover:bg-slate-50/60 transition-all"
-                  >
-                    <td className="px-6 py-4 font-mono text-xs font-semibold text-indigo-600">
-                      {product.sku}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-900">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {product.location || "Chưa xếp kệ"}
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-800">
-                      {Number(product.quantity || 0).toLocaleString()} cái
-                    </td>
-                    <td className="px-6 py-4">
-                      {product.quantity < product.minQuantity ? (
-                        <span className="bg-rose-50 text-rose-700 border border-rose-100 text-[11px] font-bold px-2 py-0.5 rounded-lg">
-                          Cần nhập thêm
+                filteredProducts.map((product) => {
+                  const isLow = product.quantity < product.minQuantity;
+                  return (
+                    <tr key={product._id}>
+                      <td>
+                        <span
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#f59e0b",
+                            background: "rgba(245,158,11,0.08)",
+                            padding: "3px 8px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(245,158,11,0.2)",
+                          }}
+                        >
+                          {product.sku}
                         </span>
-                      ) : (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-bold px-2 py-0.5 rounded-lg">
-                          An toàn
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: 13.5 }}>
+                          {product.name}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td>
+                        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+                          <MapPin size={12} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                          {product.location || (
+                            <em style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Chưa xếp kệ</em>
+                          )}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <span
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: isLow ? "#fb7185" : "var(--text-primary)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {Number(product.quantity || 0).toLocaleString()}
+                          <span style={{ fontSize: 11, fontWeight: 400, color: "var(--text-muted)", marginLeft: 4 }}>cái</span>
+                        </span>
+                      </td>
+                      <td>
+                        {isLow ? (
+                          <span className="badge badge-danger">
+                            <AlertTriangle size={9} />
+                            Cần nhập thêm
+                          </span>
+                        ) : (
+                          <span className="badge badge-success">
+                            <CheckCircle size={9} />
+                            An toàn
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-10 text-center text-slate-400"
-                  >
-                    Không tìm thấy sản phẩm nào khớp với từ khóa kiếm tìm.
+                  <td colSpan={5}>
+                    <div className="empty-state">
+                      <PackageCheck size={36} style={{ opacity: 0.2 }} />
+                      <span style={{ fontSize: 13 }}>Không tìm thấy sản phẩm nào khớp với từ khóa.</span>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -298,126 +306,151 @@ export default function InboundPage() {
         </div>
       </div>
 
-      {/* MODAL: FORM LẬP PHIẾU NHẬP KHO THỰC TẾ */}
+      {/* ===== MODAL ===== */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-150">
-            {/* Header Modal */}
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-600" /> Lập Phiếu Nhập
-                Kho
-              </h2>
+        <div className="modal-overlay">
+          <div className="modal-panel">
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36, height: 36, borderRadius: 9,
+                    background: "rgba(245,158,11,0.12)",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <FileText size={16} color="#f59e0b" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+                    Lập Phiếu Nhập Kho
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    Cập nhật số lượng hàng hóa nhập vào kho
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100 transition-all"
+                className="btn btn-icon btn-ghost"
+                style={{ width: 32, height: 32 }}
               >
-                <X className="w-5 h-5" />
+                <X size={15} />
               </button>
             </div>
 
-            {/* Form Nội dung */}
-            <form onSubmit={handleSubmitTicket} className="p-6 space-y-4">
-              {/* Chọn sản phẩm từ danh sách */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Chọn vật tư / Sản phẩm nhập
-                </label>
-                {safeProducts.length > 0 ? (
-                  <select
-                    value={formData.productSku}
-                    onChange={(e) => {
-                      const selectedProd = safeProducts.find(
-                        (p) => p.sku === e.target.value
-                      );
-                      setFormData({
-                        ...formData,
-                        productSku: selectedProd ? selectedProd.sku : "",
-                      });
-                    }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all cursor-pointer text-slate-700"
-                  >
-                    {safeProducts.map((p) => (
-                      <option key={p._id} value={p.sku}>
-                        {p.name} ({p.sku}) — Tồn: {p.quantity ?? 0}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="text-sm text-rose-500 bg-rose-50 border border-rose-100 p-3 rounded-xl">
-                    Hiện tại chưa có sản phẩm nào. Đức hãy qua trang Sản Phẩm để
-                    thêm mặt hàng trước nhé!
-                  </div>
-                )}
-              </div>
+            <form onSubmit={handleSubmitTicket}>
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                {/* Product select */}
+                <div>
+                  <label className="form-label">
+                    <PackageCheck size={12} />
+                    Chọn vật tư / Sản phẩm nhập
+                  </label>
+                  {safeProducts.length > 0 ? (
+                    <select
+                      className="form-input"
+                      value={formData.productSku}
+                      onChange={(e) => {
+                        const selectedProd = safeProducts.find((p) => p.sku === e.target.value);
+                        setFormData({ ...formData, productSku: selectedProd ? selectedProd.sku : "" });
+                      }}
+                    >
+                      {safeProducts.map((p) => (
+                        <option key={p._id} value={p.sku}>
+                          {p.name} ({p.sku}) — Tồn: {p.quantity ?? 0}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "12px 16px",
+                        background: "rgba(244,63,94,0.08)",
+                        border: "1px solid rgba(244,63,94,0.2)",
+                        borderRadius: 10,
+                        fontSize: 13,
+                        color: "#fb7185",
+                      }}
+                    >
+                      Chưa có sản phẩm nào. Hãy thêm sản phẩm trước.
+                    </div>
+                  )}
+                </div>
 
-              {/* Số lượng nhập thêm */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Số lượng nhập thêm
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={formData.qty}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      qty: parseInt(e.target.value) || 1,
-                    });
+                {/* Quantity */}
+                <div>
+                  <label className="form-label">
+                    <ArrowDownToLine size={12} />
+                    Số lượng nhập thêm
+                  </label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    required
+                    value={formData.qty}
+                    onChange={(e) => setFormData({ ...formData, qty: parseInt(e.target.value) || 1 })}
+                    style={{ fontFamily: "monospace", fontWeight: 600 }}
+                  />
+                </div>
+
+                {/* Note */}
+                <div>
+                  <label className="form-label">Ghi chú (Tùy chọn)</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    placeholder="Nhập lý do nhập bổ sung hàng hóa..."
+                    value={formData.note}
+                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                    style={{ resize: "none" }}
+                  />
+                </div>
+
+                {/* Operator info */}
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 10,
+                    fontSize: 12.5,
+                    color: "var(--text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all font-mono"
-                />
+                >
+                  <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Người thực hiện:</span>
+                  {adminName}
+                </div>
               </div>
 
-              {/* Lý do / Ghi chú nhập hàng */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Ghi chú phiếu nhập (Tùy chọn)
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Nhập lý do nhập bổ sung hàng hóa..."
-                  value={formData.note}
-                  onChange={(e) =>
-                    setFormData({ ...formData, note: e.target.value })
-                  }
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-all resize-none placeholder:text-slate-400"
-                />
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 font-medium">
-                Người thực hiện: {adminName}
-              </div>
-
-              {/* Footer Modal Actions */}
-              <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
+              <div className="modal-footer">
                 <button
                   type="button"
+                  className="btn btn-ghost"
                   onClick={() => !isSubmitting && setIsModalOpen(false)}
                   disabled={isSubmitting}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all disabled:opacity-50"
                 >
-                  <X className="w-4 h-4" /> Hủy bỏ
+                  <X size={14} />
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
+                  className="btn"
                   disabled={safeProducts.length === 0 || isSubmitting}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all shadow-md ${
-                    safeProducts.length === 0 || isSubmitting
-                      ? "bg-slate-300 cursor-not-allowed shadow-none"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
+                  style={{
+                    background: "linear-gradient(135deg, #d97706, #f59e0b)",
+                    color: "#fff",
+                    boxShadow: "0 4px 16px rgba(245,158,11,0.3)",
+                    opacity: safeProducts.length === 0 || isSubmitting ? 0.5 : 1,
+                  }}
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
-                  <span>
-                    {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
-                  </span>
+                  {isSubmitting ? <Loader2 size={14} className="spinner" /> : <Check size={14} />}
+                  {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
                 </button>
               </div>
             </form>

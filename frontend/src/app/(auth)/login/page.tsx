@@ -1,6 +1,7 @@
 // src/app/login/page.tsx
 "use client";
 
+import style from "./login.module.css";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -78,25 +79,25 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="font-['Poppins',_sans-serif] flex justify-center items-center min-h-screen relative w-full bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage: `url('https://i.pinimg.com/originals/d7/b9/0c/d7b90cc80898e8823455a127945719af.jpg')`,
-      }}
-    >
-      <div className="absolute inset-0 bg-black/20 z-0"></div>
-      <div className="relative z-10 w-[420px] bg-transparent border-2 border-white/20 backdrop-blur-[15px] shadow-[0_0_10px_rgba(0,0,0,0.2)] text-white rounded-[16px] py-10 px-10 mx-4">
+    <main className={style.loginContainer}>
+      <div className={style.overlay} />
+
+      <div className={style.glassCard}>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <h1 className="text-3xl text-center font-bold tracking-tight">
+          <h1 className="text-3xl text-center font-bold tracking-tight mb-8 text-white">
             Login
           </h1>
 
-          {loginError && (
-            <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-center text-sm text-rose-200 font-medium">
-              {loginError}
-            </div>
-          )}
+          {/* Error Message */}
+          <div className="h-10">
+            {loginError && (
+              <div className="p-2 bg-rose-500/20 border border-rose-500/40 rounded-xl text-center text-sm text-rose-200">
+                {loginError}
+              </div>
+            )}
+          </div>
 
+          {/* Username Input - pl-8 tạo khoảng cách lề trái cho chữ */}
           <div className="relative w-full h-[50px] mt-6 mb-2">
             <input
               type="text"
@@ -113,7 +114,7 @@ export default function LoginPage() {
               {errors.username.message}
             </p>
           )}
-
+          <br />
           <div className="relative w-full h-[50px] mt-4 mb-2">
             <input
               type={showPassword ? "text" : "password"}
@@ -140,19 +141,16 @@ export default function LoginPage() {
               {errors.password.message}
             </p>
           )}
-
+          <br />
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-[45px] bg-white rounded-[40px] text-base text-[#333] font-semibold flex items-center justify-center space-x-2 hover:bg-white/90 active:scale-[0.99] disabled:bg-white/70"
+            className="w-full h-[45px] bg-white rounded-[40px] text-base text-[#333] font-semibold hover:bg-white/90 transition-all"
           >
-            {isSubmitting && (
-              <div className="w-4 h-4 border-2 border-[#333]/30 border-t-[#333] rounded-full animate-spin"></div>
-            )}
-            <span>{isSubmitting ? "Processing..." : "Login"}</span>
+            {isSubmitting ? "Processing..." : "Login"}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
