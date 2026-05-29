@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import Link from "next/link";
 import { QrCode, LogIn, Warehouse, LogOut } from "lucide-react";
@@ -121,4 +121,9 @@ export default function HomePage() {
       </div>
     </main>
   );
+}
+import { redirect } from "next/navigation";
+
+export default function HomePage() {
+  redirect("/dashboard");
 }
