@@ -11,13 +11,14 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useToastStore } from "@/store/useToastStore";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { backendBaseUrl } from "@/lib/api";
 
 const loginSchema = z.object({
   username: z.string().min(3, { message: "Tên đăng nhập ít nhất 3 ký tự" }),
   password: z.string().min(6, { message: "Mật khẩu ít nhất 6 ký tự" }),
 });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = `${backendBaseUrl}/api`;
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
@@ -66,7 +67,7 @@ export default function LoginPage() {
 
       localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("userRole", user?.role || "");
-      localStorage.setItem("userName", user?.username || "");
+      localStorage.setItem("username", user?.username || "");
 
       toast("Đăng nhập thành công.", "success");
       router.push("/dashboard");

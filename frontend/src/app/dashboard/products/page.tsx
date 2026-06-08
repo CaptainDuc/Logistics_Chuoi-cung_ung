@@ -17,7 +17,7 @@ import { useToastStore } from "@/store/useToastStore";
 import { isAdminUser } from "@/lib/authRole";
 import { getFetchErrorMessage } from "@/lib/apiError";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export default function ProductsPage() {
   const products = useWarehouseStore((state) => state.products);

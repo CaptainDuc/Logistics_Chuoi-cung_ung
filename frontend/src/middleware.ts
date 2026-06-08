@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("token");
 
-  const isLoginPage = request.nextUrl.pathname === "/login";
+  const isLoginPage = request.nextUrl.pathname === "/login" || request.nextUrl.pathname.includes("auth");
 
   // chưa login
   if (!token && !isLoginPage) {
@@ -20,5 +20,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/login", "/(auth)/:path*"],
 };
+

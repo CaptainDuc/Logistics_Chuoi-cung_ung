@@ -122,8 +122,3 @@ export default function HomePage() {
     </main>
   );
 }
-import { redirect } from "next/navigation";
-
-export default function HomePage() {
-  redirect("/dashboard");
-}

@@ -1,23 +1,30 @@
 import { NextResponse } from "next/server";
+import { backendFetch } from "@/lib/api"; // Kéo hàm kết nối backend thật vào
 
 export async function POST(request: Request) {
-  const payload = await request.json().catch(() => ({}));
-  const email = String(payload?.email || "").trim();
-  const password = String(payload?.password || "").trim();
+  try {
+    const payload = await request.json().catch(() => ({}));
+    
+    // 🚀 Gửi dữ liệu đăng nhập sang Backend thật (cổng 4000)
+    const response = await backendFetch("api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
 
-  if (!email || !password) {
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { ok: false, message: data.message || "Đăng nhập thất bại." },
+        { status: response.status }
+      );
+    }
+
+    return NextResponse.json({ ok: true, ...data });
+  } catch (error) {
     return NextResponse.json(
-      { ok: false, message: "Email và mật khẩu không được để trống." },
-      { status: 400 }
+      { ok: false, message: "Không thể kết nối đến Server Backend thật." },
+      { status: 500 }
     );
   }
-
-  if (email === "nhanvien@kho.com" && password === "123456") {
-    return NextResponse.json({ ok: true, message: "Đăng nhập thành công." });
-  }
-
-  return NextResponse.json(
-    { ok: false, message: "Email hoặc mật khẩu không đúng." },
-    { status: 401 }
-  );
 }
