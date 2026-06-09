@@ -13,9 +13,10 @@ import {
   Menu,
   X,
   Warehouse,
+  Users,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 const navItems = [
   {
@@ -42,6 +43,13 @@ const navItems = [
     icon: PackageMinus,
     exact: false,
   },
+  {
+    href: "/dashboard/users",
+    label: "Tài khoản",
+    icon: Users,
+    exact: false,
+    adminOnly: true,
+  },
 ];
 
 export default function DashboardLayout({
@@ -62,7 +70,7 @@ export default function DashboardLayout({
   }, []);
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || localStorage.getItem("accessToken");
     try {
       if (token) {
         await fetch(`${API_URL}/auth/logout`, {
@@ -214,6 +222,12 @@ export default function DashboardLayout({
           {navItems.map((item) => {
             const active = isActive(item.href, item.exact);
             const Icon = item.icon;
+
+            // Chỉ hiển thị menu Admin-only cho tài khoản Admin
+            if (item.adminOnly && adminRole !== "Admin") {
+              return null;
+            }
+
             return (
               <Link
                 key={item.href}

@@ -1,12 +1,25 @@
 ﻿@import "tailwindcss";
 
 :root {
-  --bg-base: #0a0f1e;
+  --bg-base: #0d1225;
 
-  --text-primary: #f8fafc;
+  --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
-  --border: rgba(255, 255, 255, 0.1);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  --bg-card: rgba(22, 30, 52, 0.85);
+  --bg-modal: rgba(20, 26, 46, 0.97);
+
+  --accent-primary: #818cf8;
+  --accent-secondary: #a78bfa;
+
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.25s ease;
+  --transition-slow: 0.4s ease;
 }
 
 * {
@@ -704,6 +717,18 @@ select.form-input option {
   border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
+.badge-purple {
+  background: rgba(139, 92, 246, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.badge-blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
 /* ============== SEARCH BAR ============== */
 
 .search-bar {
@@ -888,53 +913,4 @@ select.form-input option {
   background: rgba(99, 102, 241, 0.2);
 
   filter: blur(120px);
-}
-
-/* Card */
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-
-  border: 1px solid var(--border);
-
-  backdrop-filter: blur(20px);
-
-  border-radius: 28px;
-
-  transition: 0.3s ease;
-}
-
-.glass-card:hover {
-  transform: translateY(-4px);
-
-  border-color: rgba(99, 102, 241, 0.4);
-}
-
-/* Button */
-
-.btn {
-  display: inline-flex;
-
-  align-items: center;
-  justify-content: center;
-
-  padding: 14px 20px;
-
-  border-radius: 18px;
-
-  font-weight: 700;
-
-  transition: 0.25s ease;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-
-  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
 }

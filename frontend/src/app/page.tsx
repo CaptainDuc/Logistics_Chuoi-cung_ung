@@ -1,40 +1,62 @@
-﻿﻿"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { QrCode, LogIn, Warehouse, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function HomePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
 
-  // Đọc thông tin đăng nhập đã lưu trong máy ra
-  useEffect(() => {
+  // Đọc thông tin đăng nhập từ localStorage
+  const readAuthFromStorage = () => {
     const savedRole = localStorage.getItem("userRole");
     const savedUsername = localStorage.getItem("username");
     setRole(savedRole);
     setUsername(savedUsername);
+  };
+
+  useEffect(() => {
+    readAuthFromStorage();
+  }, []);
+
+  // Đồng bộ khi localStorage thay đổi (ví dụ: logout từ tab khác hoặc quay về trang chủ sau logout)
+  useEffect(() => {
+    const handleStorage = () => readAuthFromStorage();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   // Hàm xử lý Đăng xuất
   const handleLogout = () => {
-    localStorage.clear(); // Xóa sạch token, role
+    localStorage.removeItem("token");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("username");
     setRole(null);
     setUsername(null);
     alert("Đã đăng xuất tài khoản!");
   };
 
   // Hàm bảo vệ nút Quét QR (Bắt buộc phải đăng nhập mới cho vào)
-  const handleGoToScan = (e: React.MouseEvent) => {
+  const handleGoToScan = (e: React.MouseEvent<HTMLAnchorElement>) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      e.preventDefault(); // Chặn không cho chuyển trang
-      alert("⚠️ Hệ thống bảo mật: Bạn cần đăng nhập trước khi sử dụng camera quét QR!");
+      e.preventDefault();
+      alert("Hệ thống bảo mật: Bạn cần đăng nhập trước khi sử dụng camera quét QR!");
       router.push("/login");
     }
   };
+
+  // Redirect đã login → dashboard
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token && pathname === "/") {
+      router.push("/dashboard");
+    }
+  }, [router]);
 
   return (
     <main className="relative min-h-screen overflow-hidden">

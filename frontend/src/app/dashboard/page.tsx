@@ -18,7 +18,10 @@ import {
   ArrowDownRight,
   Clock,
   Sparkles,
+  QrCode,
+  ArrowRightLeft,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const {
@@ -29,6 +32,7 @@ export default function DashboardPage() {
     isLoading,
   } = useWarehouseStore();
   const { adminName } = useAdminStore();
+  const router = useRouter();
 
   useEffect(() => {
     fetchProducts();
@@ -378,6 +382,130 @@ export default function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* ===== ACTION CARDS ===== */}
+      <div
+        className="animate-fade-up"
+        style={{
+          animationDelay: "220ms",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 16,
+          marginBottom: 28,
+        }}
+      >
+        {/* Card: Quét mã QR */}
+        <button
+          onClick={() => router.push("/scan")}
+          style={{
+            background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
+            border: "1px solid rgba(99,102,241,0.3)",
+            borderRadius: 16,
+            padding: "24px",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.2s ease",
+            boxShadow: "0 4px 24px rgba(99,102,241,0.15)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(99,102,241,0.25)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.15)";
+          }}
+        >
+          {/* Glow dot */}
+          <div style={{
+            position: "absolute",
+            top: -20,
+            right: -20,
+            width: 100,
+            height: 100,
+            borderRadius: "50%",
+            background: "rgba(99,102,241,0.15)",
+            filter: "blur(30px)",
+          }} />
+          <div style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(99,102,241,0.2)",
+            border: "1px solid rgba(99,102,241,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+          }}>
+            <QrCode size={24} color="#818cf8" />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+            Quét mã QR
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+            Quét mã SKU trên sản phẩm để xác minh &amp; đối soát nhanh tại kho.
+          </div>
+        </button>
+
+        {/* Card: Nhập / Xuất kho */}
+        <button
+          onClick={() => router.push("/dashboard/inbound")}
+          style={{
+            background: "linear-gradient(135deg, #1a2e1a 0%, #1a3a2a 100%)",
+            border: "1px solid rgba(16,185,129,0.25)",
+            borderRadius: 16,
+            padding: "24px",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.2s ease",
+            boxShadow: "0 4px 24px rgba(16,185,129,0.1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(16,185,129,0.2)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(16,185,129,0.1)";
+          }}
+        >
+          {/* Glow dot */}
+          <div style={{
+            position: "absolute",
+            top: -20,
+            right: -20,
+            width: 100,
+            height: 100,
+            borderRadius: "50%",
+            background: "rgba(16,185,129,0.12)",
+            filter: "blur(30px)",
+          }} />
+          <div style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(16,185,129,0.15)",
+            border: "1px solid rgba(16,185,129,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+          }}>
+            <ArrowRightLeft size={24} color="#10b981" />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+            Nhập / Xuất kho
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+            Tạo phiếu nhập kho hoặc phiếu xuất kho, quản lý hàng hóa ra vào.
+          </div>
+        </button>
       </div>
 
       {/* ===== ACTIVITY FEED ===== */}

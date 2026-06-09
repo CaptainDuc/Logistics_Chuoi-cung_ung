@@ -22,7 +22,7 @@ import { getFetchErrorMessage } from "@/lib/apiError";
 import { isAdminUser } from "@/lib/authRole";
 import { useAdminStore } from "@/store/useAdminStore";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function InboundPage() {
   const { adminName } = useAdminStore();

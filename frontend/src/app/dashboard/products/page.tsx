@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Package,
   LayoutGrid,
@@ -8,6 +8,10 @@ import {
   FileSpreadsheet,
   Loader2,
   Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import ProductCard from "./ProductCard";
 
@@ -17,31 +21,53 @@ import { useToastStore } from "@/store/useToastStore";
 import { isAdminUser } from "@/lib/authRole";
 import { getFetchErrorMessage } from "@/lib/apiError";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export default function ProductsPage() {
   const products = useWarehouseStore((state) => state.products);
+  const pagination = useWarehouseStore((state) => state.pagination);
   const isLoading = useWarehouseStore((state) => state.isLoading);
   const fetchProducts = useWarehouseStore((state) => state.fetchProducts);
   const deleteProduct = useWarehouseStore((state) => state.deleteProduct);
   const toast = useToastStore((s) => s.show);
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     setIsAdmin(isAdminUser());
   }, []);
+
+  const loadProducts = useCallback(
+    (page: number, size: number, search: string) => {
+      fetchProducts({ page, limit: size, search });
+    },
+    [fetchProducts]
+  );
+
+  // Load products on mount and when pagination/search changes
+  useEffect(() => {
+    loadProducts(currentPage, pageSize, searchQuery);
+  }, [currentPage, pageSize, searchQuery, loadProducts]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -51,6 +77,7 @@ export default function ProductsPage() {
     setDeleteTarget(null);
     if (result.ok) {
       toast("Đã xóa sản phẩm.", "success");
+      loadProducts(currentPage, pageSize, searchQuery);
     } else {
       toast(result.message, "error");
     }
@@ -66,10 +93,7 @@ export default function ProductsPage() {
       });
 
       if (!response.ok) {
-        const msg = await getFetchErrorMessage(
-          response,
-          "Không thể xuất file Excel."
-        );
+        const msg = await getFetchErrorMessage(response, "Không thể xuất file Excel.");
         throw new Error(msg);
       }
 
@@ -84,10 +108,7 @@ export default function ProductsPage() {
       window.URL.revokeObjectURL(url);
       toast("Đã tải file Excel.", "success");
     } catch (err) {
-      toast(
-        err instanceof Error ? err.message : "Có lỗi xảy ra khi xuất Excel.",
-        "error"
-      );
+      toast(err instanceof Error ? err.message : "Có lỗi xảy ra khi xuất Excel.", "error");
     } finally {
       setIsExporting(false);
     }
@@ -168,16 +189,19 @@ export default function ProductsPage() {
               Danh mục sản phẩm
             </h1>
           </div>
-          <p
-            style={{ fontSize: 13, color: "var(--text-muted)", paddingLeft: 2 }}
-          >
+          <p style={{ fontSize: 13, color: "var(--text-muted)", paddingLeft: 2 }}>
             {isAdmin
               ? "Quyền Admin: có thể xóa sản phẩm và xuất Excel."
               : "Tài khoản thường: chỉ xem và thêm sản phẩm."}{" "}
             ·{" "}
             <strong style={{ color: "var(--text-secondary)" }}>
-              {products.length} sản phẩm
+              {pagination ? `${pagination.totalItems} sản phẩm` : `${products.length} sản phẩm`}
             </strong>
+            {pagination && (
+              <span style={{ color: "var(--text-muted)" }}>
+                {" "}· Trang {pagination.currentPage}/{pagination.totalPages}
+              </span>
+            )}
           </p>
         </div>
 
@@ -197,21 +221,52 @@ export default function ProductsPage() {
               {isExporting ? "Đang xuất..." : "Xuất Excel"}
             </button>
           )}
-          <AddProductModal onSuccess={fetchProducts} />
+          <AddProductModal
+            onSuccess={() => loadProducts(currentPage, pageSize, searchQuery)}
+          />
         </div>
       </div>
 
-      {/* ===== SEARCH BAR ===== */}
-      <div className="search-bar" style={{ marginBottom: 24, maxWidth: 400 }}>
-        <Search size={15} className="search-icon" />
-        <input
-          className="form-input search-bar"
-          style={{ paddingLeft: 38 }}
-          type="text"
-          placeholder="Tìm theo tên, SKU, vị trí..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      {/* ===== SEARCH + PAGE SIZE ===== */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 24,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="search-bar" style={{ maxWidth: 400, flex: 1 }}>
+          <Search size={15} className="search-icon" />
+          <input
+            className="form-input search-bar"
+            style={{ paddingLeft: 38 }}
+            type="text"
+            placeholder="Tìm theo tên, SKU, vị trí..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Page size selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+            Hiển thị:
+          </span>
+          <select
+            className="form-input"
+            style={{ maxWidth: 90, padding: "6px 10px", fontSize: 12 }}
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size} / trang
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* ===== PRODUCT CARDS ===== */}
@@ -242,6 +297,116 @@ export default function ProductsPage() {
               onRequestDelete={(id, name) => setDeleteTarget({ id, name })}
             />
           ))}
+        </div>
+      )}
+
+      {/* ===== PAGINATION ===== */}
+      {pagination && pagination.totalPages > 1 && (
+        <div
+          style={{
+            marginTop: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {/* Info text */}
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            Hiển thị{" "}
+            <strong style={{ color: "var(--text-secondary)" }}>
+              {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}–{Math.min(
+                pagination.currentPage * pagination.itemsPerPage,
+                pagination.totalItems
+              )}
+            </strong>{" "}
+            trong <strong style={{ color: "var(--text-secondary)" }}>{pagination.totalItems}</strong> sản phẩm
+          </div>
+
+          {/* Pagination buttons */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {/* First page */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setCurrentPage(1)}
+              disabled={!pagination.hasPrevPage}
+              title="Trang đầu"
+              style={{ padding: "6px 8px" }}
+            >
+              <ChevronsLeft size={14} />
+            </button>
+
+            {/* Previous */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={!pagination.hasPrevPage}
+              title="Trang trước"
+              style={{ padding: "6px 8px" }}
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            {/* Page numbers */}
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+              .filter((page) => {
+                const cur = pagination.currentPage;
+                return (
+                  page === 1 ||
+                  page === pagination.totalPages ||
+                  Math.abs(page - cur) <= 2
+                );
+              })
+              .reduce<(number | "...")[]>((acc, page, idx, arr) => {
+                if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                  acc.push("...");
+                }
+                acc.push(page);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === "..." ? (
+                  <span
+                    key={`ellipsis-${idx}`}
+                    style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 13 }}
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setCurrentPage(item as number)}
+                    className={`btn ${pagination.currentPage === item ? "btn-primary" : "btn-ghost"}`}
+                    style={{ padding: "6px 12px", minWidth: 36 }}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+            {/* Next */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+              disabled={!pagination.hasNextPage}
+              title="Trang sau"
+              style={{ padding: "6px 8px" }}
+            >
+              <ChevronRight size={14} />
+            </button>
+
+            {/* Last page */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setCurrentPage(pagination.totalPages)}
+              disabled={!pagination.hasNextPage}
+              title="Trang cuối"
+              style={{ padding: "6px 8px" }}
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
         </div>
       )}
 
