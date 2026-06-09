@@ -1,5 +1,4 @@
-# 1. Bỏ qua Backend (Tránh đẩy bản ở máy lên GitHub)
-backend/
+
 
 # Node dependencies
 node_modules/

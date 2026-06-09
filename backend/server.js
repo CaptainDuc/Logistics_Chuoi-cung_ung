@@ -1,18 +1,3 @@
-/**
- * =========================================================
- * FILE CHẠY CHÍNH CỦA HỆ THỐNG QUẢN LÝ KHO HÀNG - PTIT
- * =========================================================
- *
- * File này thực hiện:
- * - Khởi tạo server Express.
- * - Kết nối MongoDB thông qua Mongoose.
- * - Cấu hình middleware CORS, JSON parser.
- * - Đăng ký tất cả các route API:
- *     /api/auth       → authRoutes       (Đăng nhập / Đăng xuất / Làm mới token)
- *     /api/products   → productRoutes   (CRUD Sản phẩm)
- *     /api/inventory  → inventoryRoutes (Quét mã QR / Lịch sử kho / Xuất Excel)
- * - Lắng nghe trên cổng từ biến môi trường (PORT).
- */
 require("dotenv").config();
 
 const express = require("express");
@@ -32,11 +17,10 @@ const app = express();
 // MIDDLEWARE CẤU HÌNH
 // =========================================================
 
+// Cho phép CORS từ bất kỳ nguồn nào hoặc danh sách cụ thể
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-      : "*",
+    origin: "*", // Bạn có thể thay bằng mảng các domain thật sau khi deploy xong
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -55,46 +39,26 @@ app.use((req, res, next) => {
 });
 
 // =========================================================
-// HEALTH CHECK
+// HEALTH CHECK & ROUTES
 // =========================================================
 
 app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "🚀 Hệ thống Quản lý Kho hàng PTIT đang hoạt động!",
-    version: "1.0.0",
-    timestamp: new Date().toISOString(),
-  });
+  res
+    .status(200)
+    .json({ success: true, message: "Hệ thống Smart WMS đang hoạt động!" });
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy.",
-    uptime: Math.floor(process.uptime()),
-    timestamp: new Date().toISOString(),
-  });
+  res
+    .status(200)
+    .json({
+      success: true,
+      message: "Server is healthy.",
+      uptime: Math.floor(process.uptime()),
+    });
 });
 
-// =========================================================
-// SWAGGER API DOCUMENTATION
-// =========================================================
-
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpecs, {
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Smart WMS - API Documentation",
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  })
-);
-
-// =========================================================
-// ĐĂNG KÝ ROUTES
-// =========================================================
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -102,91 +66,52 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/users", userRoutes);
 
 // =========================================================
-// XỬ LÝ ROUTE KHÔNG TỒN TẠI (404)
+// XỬ LÝ LỖI
 // =========================================================
 
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Route không tồn tại: ${req.method} ${req.originalUrl}`,
-  });
+  res
+    .status(404)
+    .json({
+      success: false,
+      message: `Route không tồn tại: ${req.method} ${req.originalUrl}`,
+    });
 });
-
-// =========================================================
-// XỬ LÝ LỖI SERVER TỔNG QUÁT (500)
-// =========================================================
 
 app.use((err, req, res, next) => {
-  console.error("[Server] Lỗi không xử lý được:", err.message);
-  if (err.stack) {
-    console.error("[Server] Stack trace:", err.stack);
-  }
-
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || "Đã xảy ra lỗi server nội bộ.",
-  });
+  console.error("[Server] Lỗi:", err.message);
+  res
+    .status(err.statusCode || 500)
+    .json({ success: false, message: err.message || "Đã xảy ra lỗi server." });
 });
 
 // =========================================================
-// KHỞI CHẠY SERVER
+// KHỞI CHẠY SERVER (Dành cho Railway)
 // =========================================================
 
 const PORT = process.env.PORT || 5000;
 
 const khoiDongServer = async () => {
   try {
-    console.log("========================================");
-    console.log("   HỆ THỐNG QUẢN LÝ KHO HÀNG - PTIT    ");
-    console.log("========================================\n");
-
-    console.log("[Server] Đang kết nối MongoDB...");
     await ketNoiMongoDB();
-
-    const server = app.listen(PORT, () => {
-      console.log(`[Server] ✅ HTTP Server đang lắng nghe trên cổng: ${PORT}`);
-      console.log(`[Server] 🌐 Health check: http://localhost:${PORT}/health`);
-      console.log(`[Server] 📡 Base API URL:  http://localhost:${PORT}/api`);
-      console.log("\n========================================");
-      console.log("   CÁC ENDPOINT API CHÍNH");
-      console.log("========================================");
-      console.log("  Auth:      POST /api/auth/login");
-      console.log("            POST /api/auth/refresh-token");
-      console.log("            POST /api/auth/logout");
-      console.log("  Products:  GET    /api/products");
-      console.log("            GET    /api/products/:id");
-      console.log("            POST   /api/products");
-      console.log("            PUT    /api/products/:id");
-      console.log("            DELETE /api/products/:id  (Admin only)");
-      console.log("  Inventory: POST   /api/inventory/scan");
-      console.log("            GET    /api/inventory/logs");
-      console.log("            GET    /api/inventory/export-excel  (Admin only)");
-      console.log("========================================\n");
+    // Quan trọng: Thêm "0.0.0.0" để Railway bắt được traffic
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[Server] ✅ Server đang chạy tại cổng: ${PORT}`);
     });
 
     const tatServer = async (signal) => {
-      console.log(`\n[Server] 📛 Nhận tín hiệu ${signal}. Đang tắt server...`);
+      console.log(`\n[Server] 📛 Tắt server...`);
       server.close(async () => {
-        console.log("[Server] ✅ HTTP Server đã đóng.");
         const mongoose = require("./src/config/db").mongoose;
-        if (mongoose.connection.readyState === 1) {
-          await mongoose.connection.close();
-          console.log("[Server] ✅ Kết nối MongoDB đã đóng.");
-        }
+        if (mongoose) await mongoose.connection.close();
         process.exit(0);
       });
-
-      setTimeout(() => {
-        console.error("[Server] ❌ Không thể đóng gracefully. Force quit.");
-        process.exit(1);
-      }, 10000);
     };
 
     process.on("SIGTERM", () => tatServer("SIGTERM"));
     process.on("SIGINT", () => tatServer("SIGINT"));
   } catch (err) {
-    console.error("[Server] ❌ KHÔNG THỂ KHỞI ĐỘNG SERVER!");
-    console.error(`[Server] Lỗi: ${err.message}`);
+    console.error("❌ KHÔNG THỂ KHỞI ĐỘNG SERVER:", err.message);
     process.exit(1);
   }
 };
