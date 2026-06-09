@@ -18,10 +18,13 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { ketNoiMongoDB } = require("./src/config/db");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpecs = require("./src/config/swagger");
 
 const authRoutes = require("./src/routes/authRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const inventoryRoutes = require("./src/routes/inventoryRoutes");
+const userRoutes = require("./src/routes/userRoutes");
 
 const app = express();
 
@@ -74,12 +77,29 @@ app.get("/health", (req, res) => {
 });
 
 // =========================================================
+// SWAGGER API DOCUMENTATION
+// =========================================================
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpecs, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "Smart WMS - API Documentation",
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  })
+);
+
+// =========================================================
 // ĐĂNG KÝ ROUTES
 // =========================================================
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/users", userRoutes);
 
 // =========================================================
 // XỬ LÝ ROUTE KHÔNG TỒN TẠI (404)
