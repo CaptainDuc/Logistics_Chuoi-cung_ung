@@ -1,22 +1,36 @@
 import { create } from 'zustand';
 
+export type ToastType = 'success' | 'error' | 'info';
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
+}
+
 interface ToastState {
-  message: string | null;
-  type: 'success' | 'error' | 'info';
-  isVisible: boolean;
-  show: (message: string, type?: 'success' | 'error' | 'info') => void;
-  hide: () => void;
+  toasts: Toast[];
+  show: (message: string, type?: ToastType) => void;
+  dismiss: (id: string) => void;
 }
 
 export const useToastStore = create<ToastState>((set) => ({
-  message: null,
-  type: 'info',
-  isVisible: false,
+  toasts: [],
   show: (message, type = 'info') => {
-    set({ message, type, isVisible: true });
+    const id = Math.random().toString(36).slice(2, 9);
+    set((state) => ({
+      toasts: [...state.toasts, { id, message, type }],
+    }));
+    
+    // Tự động xóa sau 3 giây
     setTimeout(() => {
-      set({ isVisible: false });
+      set((state) => ({
+        toasts: state.toasts.filter((t) => t.id !== id),
+      }));
     }, 3000);
   },
-  hide: () => set({ isVisible: false }),
+  dismiss: (id) =>
+    set((state) => ({
+      toasts: state.toasts.filter((t) => t.id !== id),
+    })),
 }));

@@ -3,7 +3,7 @@ import axios from "axios";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { backendBaseUrl } from "@/lib/api";
 
-const API_URL = `${backendBaseUrl}/api`;
+const API_URL = backendBaseUrl.endsWith('/api') ? backendBaseUrl : `${backendBaseUrl}/api`;
 
 export type MutationResult =
   | { ok: true }
