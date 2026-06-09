@@ -1,259 +1,90 @@
 /**
- * Script khởi tạo dữ liệu mẫu (seed data) cho hệ thống quản lý kho hàng.
- * Chạy: node seed.js
- *
- * LƯU Ý: Script này XÓA toàn bộ dữ liệu cũ trong 4 collections trước khi nạp mới.
- * Chỉ chạy trong môi trường phát triển hoặc khi cần reset database.
+ * SEED DATA — WHFlow Nexus Pro
+ * Chay: cd backend && node seed.js
+ * Xoa toan bo du lieu cu truoc khi nap moi.
  */
-require("dotenv").config();
 
-const User = require("./src/models/User");
-const Product = require("./src/models/Product");
-const Supplier = require("./src/models/Supplier");
-const InventoryLog = require("./src/models/InventoryLog");
-const { ketNoiMongoDB, mongoose } = require("./src/config/db");
-const bcrypt = require("bcryptjs");
+require('dotenv').config();
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('./src/models/User');
+const Product = require('./src/models/Product');
+const Supplier = require('./src/models/Supplier');
+const InventoryLog = require('./src/models/InventoryLog');
+const { ketNoiMongoDB } = require('./src/config/db');
 
-async function chaySeedDuLieu() {
-  try {
-    console.log("\n============================================");
-    console.log("         SEED DATA - BẮT ĐẦU               ");
-    console.log("============================================\n");
+async function seed() {
+  console.log('[WHFlow] SEED - BAT DAU');
+  await ketNoiMongoDB();
 
-    await ketNoiMongoDB();
+  console.log('[1/5] Xoa du lieu cu...');
+  await InventoryLog.deleteMany({});
+  await Product.deleteMany({});
+  await Supplier.deleteMany({});
+  await User.deleteMany({});
 
-    console.log("[SEED] Đang xóa dữ liệu cũ trong các collections...");
-    await InventoryLog.deleteMany({});
-    await Product.deleteMany({});
-    await Supplier.deleteMany({});
-    await User.deleteMany({});
-    console.log("[SEED] Đã xóa sạch dữ liệu cũ.\n");
+  console.log('[2/5] Tao tai khoan...');
+  const mk = await bcrypt.hash('123456', 10);
+  const adminUser = await User.create({ username: 'ducthinh', password: mk, email: 'ducthinhn@gmail.com', role: 'Admin', isActive: true });
+  const staff1 = await User.create({ username: 'nvkho_tuan', password: mk, email: 'tuan.nvkho@gmail.com', role: 'User', isActive: true });
+  const staff2 = await User.create({ username: 'nvkho_huong', password: mk, email: 'huong.nvkho@gmail.com', role: 'User', isActive: true });
+  await User.create({ username: 'nv_nghisv', password: mk, role: 'User', isActive: false });
+  console.log('  TK: ducthinh / 123456 (Admin)');
+  console.log('  TK: nvkho_tuan / 123456 (User)');
+  console.log('  TK: nvkho_huong / 123456 (User)');
+  console.log('  TK: nv_nghisv / 123456 (User - bi khoa)');
 
-    // Tạo 3 tài khoản người dùng
-    console.log("[SEED] Đang tạo tài khoản người dùng...");
-    const matKhauDaMaHoa = await bcrypt.hash("123456", 10);
+  console.log('[3/5] Tao nha cung cap...');
+  const ncc1 = await Supplier.create({ name: 'Cong Ty TNHH Vat Tu Ky Thuat ABC', contactName: 'Nguyen Van An', email: 'an.nv@vatutuabc.com', phone: '0909 123 456' });
+  const ncc2 = await Supplier.create({ name: 'Cong Ty CP Thuong Mai CN XYZ', contactName: 'Tran Thi Binh', email: 'binh.tt@thuongmaixyz.vn', phone: '0918 234 567' });
+  const ncc3 = await Supplier.create({ name: 'Tong Kho Linh Kien So Toan Cau', contactName: 'Pham Hong Minh', email: 'minh.ph@linhkienso.com', phone: '0933 456 789' });
+  const ncc4 = await Supplier.create({ name: 'Vien Thong Dien Tu Nam Phat', contactName: 'Le Hoang Nam', email: 'nam.lh@viendientunamphat.vn', phone: '028 3812 3456' });
 
-    const taiKhoanAdmin = await User.create({
-      username: "admin",
-      password: matKhauDaMaHoa,
-      role: "Admin",
-    });
-    console.log(
-      `[SEED]   - Admin: username="admin", password="123456", role="Admin"`,
-    );
-
-    const taiKhoanStaff = await User.create({
-      username: "staff",
-      password: matKhauDaMaHoa,
-      role: "User",
-    });
-    console.log(
-      `[SEED]   - Staff: username="staff", password="123456", role="User"`,
-    );
-
-    const taiKhoanKho = await User.create({
-      username: "kho01",
-      password: matKhauDaMaHoa,
-      role: "User",
-    });
-    console.log(
-      `[SEED]   - Nhân viên kho: username="kho01", password="123456", role="User"`,
-    );
-    console.log("[SEED] Đã tạo xong tài khoản người dùng.\n");
-
-    // Tạo 3 nhà cung cấp
-    console.log("[SEED] Đang tạo nhà cung cấp...");
-    const nhaCungCap1 = await Supplier.create({
-      name: "Công Ty TNHH Vật Tư ABC",
-      contactName: "Nguyễn Văn An",
-      email: "an.nv@vatutuabc.com",
-      phone: "0909123456",
-    });
-    console.log(
-      `[SEED]   - NCC 1: "${nhaCungCap1.name}" (ID: ${nhaCungCap1._id})`,
-    );
-
-    const nhaCungCap2 = await Supplier.create({
-      name: "Công Ty CP Thương Mại XYZ",
-      contactName: "Trần Thị Bình",
-      email: "binh.tt@thuongmaixyz.vn",
-      phone: "0918234567",
-    });
-    console.log(
-      `[SEED]   - NCC 2: "${nhaCungCap2.name}" (ID: ${nhaCungCap2._id})`,
-    );
-
-    const nhaCungCap3 = await Supplier.create({
-      name: "Tổng Kho Linh Kiện Số Toàn Cầu",
-      contactName: "Phạm Hồng Minh",
-      email: "minh.ph@linhkienso.com",
-      phone: "0933456789",
-    });
-    console.log(
-      `[SEED]   - NCC 3: "${nhaCungCap3.name}" (ID: ${nhaCungCap3._id})`,
-    );
-    console.log("[SEED] Đã tạo xong nhà cung cấp.\n");
-
-    // Tạo 6 sản phẩm
-    console.log("[SEED] Đang tạo sản phẩm...");
-    const sanPham1 = await Product.create({
-      name: "Máy tính xách tay Dell XPS 13",
-      sku: "LAP-DELL-XPS13-001",
-      quantity: 0,
-      minQuantity: 5,
-      supplierId: nhaCungCap1._id,
-      location: "Kệ A1 - Tầng 1",
-    });
-    console.log(`[SEED]   - SP1: "${sanPham1.name}" (SKU: ${sanPham1.sku})`);
-
-    const sanPham2 = await Product.create({
-      name: "Chuột không dây Logitech MX Master 3S",
-      sku: "MOU-LOGI-MX3S-002",
-      quantity: 0,
-      minQuantity: 20,
-      supplierId: nhaCungCap1._id,
-      location: "Kệ B3 - Tầng 1",
-    });
-    console.log(`[SEED]   - SP2: "${sanPham2.name}" (SKU: ${sanPham2.sku})`);
-
-    const sanPham3 = await Product.create({
-      name: "Bàn phím cơ Keychron K8 Pro",
-      sku: "KEY-KEYC-K8P-003",
-      quantity: 0,
-      minQuantity: 10,
-      supplierId: nhaCungCap2._id,
-      location: "Kệ C2 - Tầng 2",
-    });
-    console.log(`[SEED]   - SP3: "${sanPham3.name}" (SKU: ${sanPham3.sku})`);
-
-    const sanPham4 = await Product.create({
-      name: "Tai nghe chống ồn Sony WH-1000XM5",
-      sku: "EAR-SONY-XM5-004",
-      quantity: 0,
-      minQuantity: 8,
-      supplierId: nhaCungCap2._id,
-      location: "Kệ C4 - Tầng 2",
-    });
-    console.log(`[SEED]   - SP4: "${sanPham4.name}" (SKU: ${sanPham4.sku})`);
-
-    const sanPham5 = await Product.create({
-      name: "Bộ định tuyến Wi-Fi 6 ASUS RT-AX88U",
-      sku: "NET-ASUS-AX88U-005",
-      quantity: 0,
-      minQuantity: 15,
-      supplierId: nhaCungCap3._id,
-      location: "Kệ D1 - Tầng 3",
-    });
-    console.log(`[SEED]   - SP5: "${sanPham5.name}" (SKU: ${sanPham5.sku})`);
-
-    const sanPham6 = await Product.create({
-      name: "Ổ cứng SSD Samsung 990 Pro 1TB",
-      sku: "SSD-SAMS-990P-006",
-      quantity: 0,
-      minQuantity: 30,
-      supplierId: nhaCungCap3._id,
-      location: "Kệ E2 - Tầng 1",
-    });
-    console.log(`[SEED]   - SP6: "${sanPham6.name}" (SKU: ${sanPham6.sku})`);
-    console.log("[SEED] Đã tạo xong sản phẩm.\n");
-
-    // Tạo các lịch sử biến động kho hàng (Nhập / Xuất)
-    console.log("[SEED] Đang tạo log nhập/xuất kho...");
-
-    await InventoryLog.create({
-      productId: sanPham1._id,
-      userId: taiKhoanAdmin._id,
-      type: "Import",
-      quantity: 25,
-    });
-    await InventoryLog.create({
-      productId: sanPham2._id,
-      userId: taiKhoanAdmin._id,
-      type: "Import",
-      quantity: 60,
-    });
-    await InventoryLog.create({
-      productId: sanPham3._id,
-      userId: taiKhoanStaff._id,
-      type: "Import",
-      quantity: 40,
-    });
-    await InventoryLog.create({
-      productId: sanPham4._id,
-      userId: taiKhoanKho._id,
-      type: "Import",
-      quantity: 15,
-    });
-    await InventoryLog.create({
-      productId: sanPham5._id,
-      userId: taiKhoanKho._id,
-      type: "Import",
-      quantity: 30,
-    });
-    await InventoryLog.create({
-      productId: sanPham6._id,
-      userId: taiKhoanAdmin._id,
-      type: "Import",
-      quantity: 12,
-    });
-
-    await InventoryLog.create({
-      productId: sanPham1._id,
-      userId: taiKhoanStaff._id,
-      type: "Export",
-      quantity: 5,
-    });
-    await InventoryLog.create({
-      productId: sanPham2._id,
-      userId: taiKhoanKho._id,
-      type: "Export",
-      quantity: 10,
-    });
-    await InventoryLog.create({
-      productId: sanPham3._id,
-      userId: taiKhoanKho._id,
-      type: "Export",
-      quantity: 15,
-    });
-
-    console.log("[SEED] Đã tạo xong hệ thống log biến động.\n");
-
-    console.log("[SEED] Đang đồng bộ số lượng sản phẩm tồn kho thực tế...");
-    await Product.findByIdAndUpdate(sanPham1._id, { quantity: 20 });
-    await Product.findByIdAndUpdate(sanPham2._id, { quantity: 50 });
-    await Product.findByIdAndUpdate(sanPham3._id, { quantity: 25 });
-    await Product.findByIdAndUpdate(sanPham4._id, { quantity: 15 });
-    await Product.findByIdAndUpdate(sanPham5._id, { quantity: 30 });
-    await Product.findByIdAndUpdate(sanPham6._id, { quantity: 12 });
-    console.log("[SEED] Đã cập nhật số lượng tồn kho cho các sản phẩm.\n");
-
-    await mongoose.connection.close();
-    console.log("[SEED] Đã ngắt kết nối MongoDB.\n");
-
-    console.log("============================================");
-    console.log("          SEED DATA - HOÀN TẤT             ");
-    console.log("============================================");
-    console.log("Tài khoản đăng nhập hệ thống:");
-    console.log(
-      '  1. Admin:  username="admin",  password="123456", role="Admin"',
-    );
-    console.log('  2. Staff:  username="staff",  password="123456", role="User"');
-    console.log(
-      '  3. Thủ kho: username="kho01", password="123456", role="User"',
-    );
-    console.log("============================================\n");
-
-  } catch (err) {
-    console.error("\n[SEED]  Đã xảy ra lỗi trong quá trình seed dữ liệu!");
-    console.error(`[SEED] Lỗi: ${err.message}`);
-
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
-    process.exit(1);
+  console.log('[4/5] Tao 18 san pham...');
+  const sp = [];
+  const products = [
+    ['May tinh xach tay Dell XPS 13 Plus 9320', 'LAP-DELL-XP13P-001', 25, 5, ncc1, 'Ke A1 - Tang 1 - Khu A'],
+    ['May tinh xach tay MacBook Air M2 13"', 'LAP-APPL-MBA2-002', 15, 3, ncc2, 'Ke A2 - Tang 1 - Khu A'],
+    ['Chuot khong day Logitech MX Master 3S', 'MOU-LOGI-MX3S-003', 48, 20, ncc1, 'Ke B3 - Tang 1 - Khu B'],
+    ['Chuot gaming Razer DeathAdder V3 Pro', 'MOU-RAZR-DAV3-004', 12, 15, ncc2, 'Ke B4 - Tang 1 - Khu B'],
+    ['Ban phim co Keychron K8 Pro', 'KEY-KEYC-K8P-005', 32, 10, ncc1, 'Ke C2 - Tang 2 - Khu C'],
+    ['Ban phim co Corsair K70 RGB Pro', 'KEY-CORS-K70P-006', 8, 10, ncc2, 'Ke C3 - Tang 2 - Khu C'],
+    ['Man hinh LG UltraGear 27" 4K IPS', 'MON-LG-27U60-007', 20, 5, ncc3, 'Ke D1 - Tang 2 - Khu D'],
+    ['Man hinh Samsung Odyssey G7 32" Curved', 'MON-SAMS-G732-008', 7, 3, ncc3, 'Ke D2 - Tang 2 - Khu D'],
+    ['Tai nghe chong on Sony WH-1000XM5', 'EAR-SONY-XM5-009', 18, 8, ncc2, 'Ke E1 - Tang 2 - Khu E'],
+    ['Tai nghe AirPods Pro 2 USB-C', 'EAR-APPL-APP2-010', 30, 10, ncc2, 'Ke E2 - Tang 2 - Khu E'],
+    ['Webcam Logitech Brio 4K Pro', 'CAM-LOGI-BRIO-011', 22, 10, ncc4, 'Ke F1 - Tang 3 - Khu F'],
+    ['Webcam Razer Kiyo Pro Ultra 4K', 'CAM-RAZR-KYU-012', 9, 5, ncc4, 'Ke F2 - Tang 3 - Khu F'],
+    ['Bo dinh tuyen Wi-Fi 6 ASUS RT-AX88U', 'NET-ASUS-AX88-013', 35, 15, ncc3, 'Ke G1 - Tang 3 - Khu G'],
+    ['Switch TP-Link 24-Port PoE+ JetStream', 'NET-TPLI-POE24-014', 14, 5, ncc4, 'Ke G2 - Tang 3 - Khu G'],
+    ['O cung SSD Samsung 990 Pro 1TB NVMe', 'SSD-SAMS-990P-015', 55, 30, ncc3, 'Ke H1 - Tang 3 - Khu H'],
+    ['O cung HDD Western Purple 4TB NAS', 'HDD-WD-PURP-016', 18, 10, ncc3, 'Ke H2 - Tang 3 - Khu H'],
+    ['Dock USB-C CalDigit TS4 Thunderbolt 4', 'DOC-CALD-TS4-017', 6, 5, ncc2, 'Ke I1 - Tang 4 - Khu I'],
+    ['Hub USB 3.0 7-Port Anker AM-CF0f', 'HUB-ANKE-A7U3-018', 40, 20, ncc1, 'Ke I2 - Tang 4 - Khu I'],
+  ];
+  for (const [name, sku, qty, min, supplier, loc] of products) {
+    const p = await Product.create({ name, sku, quantity: qty, minQuantity: min, supplierId: supplier._id, location: loc });
+    sp.push(p);
   }
+  console.log('  18 san pham tao xong');
+
+  console.log('[5/5] Tao nhap/xuat kho...');
+  const rand = () => [adminUser, staff1, staff2][Math.floor(Math.random() * 3)];
+  for (const p of sp) {
+    await InventoryLog.create({ productId: p._id, userId: rand()._id, type: 'Import', quantity: Math.floor(Math.random() * 30) + 5 });
+  }
+  const expIdx = [0, 2, 3, 5, 7, 8, 10, 12, 14, 16, 17];
+  for (const i of expIdx) {
+    await InventoryLog.create({ productId: sp[i]._id, userId: rand()._id, type: 'Export', quantity: Math.floor(Math.random() * 8) + 1 });
+  }
+  const imp = await InventoryLog.countDocuments({ type: 'Import' });
+  const exp = await InventoryLog.countDocuments({ type: 'Export' });
+  console.log('  ' + imp + ' phieu Nhap, ' + exp + ' phieu Xuat');
+
+  await mongoose.connection.close();
+  console.log('SEED HOAN TAM');
+  console.log('18 SP | 4 NCC | ' + imp + ' nhap | ' + exp + ' xuat');
+  console.log('SKU test: LAP-DELL-XP13P-001, MOU-LOGI-MX3S-003, KEY-KEYC-K8P-005, MON-LG-27U60-007, EAR-SONY-XM5-009...');
 }
 
-if (require.main === module) {
-  chaySeedDuLieu();
-}
+seed().catch(err => { console.error('LOI: ' + err.message); process.exit(1); });
