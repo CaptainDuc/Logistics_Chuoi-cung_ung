@@ -1,43 +1,80 @@
 /**
  * Controller xử lý các nghiệp vụ liên quan đến Sản Phẩm (Product).
  * Cung cấp đầy đủ CRUD: lấy danh sách, chi tiết, thêm mới, cập nhật, xóa.
+ * Hỗ trợ PHÂN TRANG (pagination) và tìm kiếm.
  * Tất cả các hàm đều được bảo vệ bởi middleware protect (yêu cầu đăng nhập).
  */
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
 
-/**
+/* =========================================================
  * GET /api/products
- * Lấy toàn bộ danh sách sản phẩm trong kho.
- * Hỗ trợ tìm kiếm theo tên (query ?search=), lọc theo nhà cung cấp (query ?supplierId=).
- * populate supplierId để trả về thông tin nhà cung cấp thay vì chỉ ObjectId.
- */
+ * Lấy danh sách sản phẩm với PHÂN TRANG.
+ * Query params:
+ *   - ?page=        : trang hiện tại (mặc định 1)
+ *   - ?limit=      : số item/trang (mặc định 20, tối đa 100)
+ *   - ?search=      : tìm theo tên sản phẩm
+ *   - ?supplierId=  : lọc theo nhà cung cấp
+ *   - ?sortBy=      : trường sắp xếp (mặc định createdAt)
+ *   - ?sortOrder=   : asc | desc (mặc định desc)
+ * ========================================================= */
 const layTatCaSanPham = async (req, res) => {
   try {
-    const { search, supplierId } = req.query;
-    const filter = {};
+    const {
+      page,
+      limit,
+      search,
+      supplierId,
+      sortBy,
+      sortOrder,
+    } = req.query;
 
-    // Tìm kiếm theo tên sản phẩm (không phân biệt hoa thường).
+    // Parse pagination params
+    const soTrang = Math.max(1, parseInt(page) || 1);
+    const soItemTrenTrang = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const boQua = (soTrang - 1) * soItemTrenTrang;
+
+    // Build filter
+    const filter = {};
     if (search) {
       filter.name = { $regex: search, $options: 'i' };
     }
-
-    // Lọc theo nhà cung cấp nếu có.
     if (supplierId) {
       filter.supplierId = supplierId;
     }
 
-    const danhSachSanPham = await Product.find(filter)
-      .populate('supplierId', 'name contactName phone')
-      .sort({ createdAt: -1 });
+    // Build sort
+    const truongSort = ['name', 'sku', 'quantity', 'createdAt', 'updatedAt'].includes(sortBy)
+      ? sortBy
+      : 'createdAt';
+    const thuTuSort = sortOrder === 'asc' ? 1 : -1;
+
+    // Query song song: data + count
+    const [danhSachSanPham, tongSo] = await Promise.all([
+      Product.find(filter)
+        .populate('supplierId', 'name contactName phone')
+        .sort({ [truongSort]: thuTuSort })
+        .skip(boQua)
+        .limit(soItemTrenTrang)
+        .lean(),
+      Product.countDocuments(filter),
+    ]);
+
+    const tongSoTrang = Math.ceil(tongSo / soItemTrenTrang);
 
     return res.status(200).json({
       success: true,
-      message: `Lấy danh sách sản phẩm thành công. Tìm thấy ${danhSachSanPham.length} sản phẩm.`,
+      message: `Lấy danh sách sản phẩm thành công. Trang ${soTrang}/${tongSoTrang}.`,
       data: danhSachSanPham,
-      total: danhSachSanPham.length,
+      pagination: {
+        currentPage: soTrang,
+        totalPages: tongSoTrang,
+        totalItems: tongSo,
+        itemsPerPage: soItemTrenTrang,
+        hasNextPage: soTrang < tongSoTrang,
+        hasPrevPage: soTrang > 1,
+      },
     });
-
   } catch (err) {
     console.error('[Product Controller] Lỗi layTatCaSanPham:', err.message);
     return res.status(500).json({
@@ -47,16 +84,16 @@ const layTatCaSanPham = async (req, res) => {
   }
 };
 
-/**
+/* =========================================================
  * GET /api/products/:id
  * Lấy chi tiết một sản phẩm theo ID.
- * populate supplierId để trả thông tin nhà cung cấp đầy đủ.
- */
+ * ========================================================= */
 const layChiTietSanPham = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const sanPham = await Product.findById(id).populate('supplierId', 'name contactName email phone');
+    const sanPham = await Product.findById(id)
+      .populate('supplierId', 'name contactName email phone');
 
     if (!sanPham) {
       return res.status(404).json({
@@ -70,17 +107,14 @@ const layChiTietSanPham = async (req, res) => {
       message: 'Lấy chi tiết sản phẩm thành công.',
       data: sanPham,
     });
-
   } catch (err) {
     console.error('[Product Controller] Lỗi layChiTietSanPham:', err.message);
-
     if (err.name === 'CastError') {
       return res.status(400).json({
         success: false,
         message: `ID sản phẩm không hợp lệ: ${req.params.id}.`,
       });
     }
-
     return res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy chi tiết sản phẩm.',
@@ -88,12 +122,10 @@ const layChiTietSanPham = async (req, res) => {
   }
 };
 
-/**
+/* =========================================================
  * POST /api/products
  * Thêm mới một sản phẩm vào kho.
- * Tự động chuẩn hóa SKU về chữ hoa (schema đã cấu hình uppercase: true).
- * Kiểm tra SKU trùng lặp trước khi tạo mới.
- */
+ * ========================================================= */
 const taoSanPhamMoi = async (req, res) => {
   try {
     const { name, sku, quantity, minQuantity, supplierId, location } = req.body;
@@ -105,7 +137,20 @@ const taoSanPhamMoi = async (req, res) => {
       });
     }
 
-    // Kiểm tra SKU đã tồn tại chưa (SKU unique trong schema, nhưng bắt lỗi để trả message rõ ràng hơn).
+    if (quantity !== undefined && (typeof quantity !== 'number' || quantity < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Số lượng (quantity) phải là số không âm.',
+      });
+    }
+
+    if (minQuantity !== undefined && (typeof minQuantity !== 'number' || minQuantity < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Số lượng tối thiểu (minQuantity) phải là số không âm.',
+      });
+    }
+
     const skuTonTai = await Product.findOne({ sku: sku.trim().toUpperCase() });
     if (skuTonTai) {
       return res.status(409).json({
@@ -114,7 +159,6 @@ const taoSanPhamMoi = async (req, res) => {
       });
     }
 
-    // Kiểm tra supplierId có tồn tại trong DB không (nếu được cung cấp).
     if (supplierId) {
       const nhaCungCap = await Supplier.findById(supplierId);
       if (!nhaCungCap) {
@@ -139,17 +183,14 @@ const taoSanPhamMoi = async (req, res) => {
       message: 'Tạo sản phẩm mới thành công.',
       data: sanPhamMoi,
     });
-
   } catch (err) {
     console.error('[Product Controller] Lỗi taoSanPhamMoi:', err.message);
-
     if (err.code === 11000) {
       return res.status(409).json({
         success: false,
         message: 'Mã SKU đã tồn tại trong hệ thống.',
       });
     }
-
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map((e) => e.message);
       return res.status(400).json({
@@ -157,7 +198,6 @@ const taoSanPhamMoi = async (req, res) => {
         message: messages.join('; '),
       });
     }
-
     return res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo sản phẩm mới.',
@@ -165,18 +205,15 @@ const taoSanPhamMoi = async (req, res) => {
   }
 };
 
-/**
+/* =========================================================
  * PUT /api/products/:id
  * Cập nhật thông tin sản phẩm theo ID.
- * Cho phép cập nhật từng trường một cách linh hoạt.
- * Không cho phép sửa SKU nếu trùng với sản phẩm khác.
- */
+ * ========================================================= */
 const capNhatSanPham = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, sku, quantity, minQuantity, supplierId, location } = req.body;
 
-    // Kiểm tra sản phẩm có tồn tại không.
     const sanPhamHienTai = await Product.findById(id);
     if (!sanPhamHienTai) {
       return res.status(404).json({
@@ -185,7 +222,6 @@ const capNhatSanPham = async (req, res) => {
       });
     }
 
-    // Nếu cập nhật SKU, kiểm tra trùng lặp (không tính chính sản phẩm đang sửa).
     if (sku) {
       const skuMoi = sku.trim().toUpperCase();
       const skuTrung = await Product.findOne({
@@ -200,10 +236,9 @@ const capNhatSanPham = async (req, res) => {
       }
     }
 
-    // Kiểm tra supplierId hợp lệ (nếu được cung cấp).
     if (supplierId !== undefined) {
       if (supplierId === null || supplierId === '') {
-        // Cho phép xóa liên kết nhà cung cấp.
+        sanPhamHienTai.supplierId = null;
       } else {
         const nhaCungCap = await Supplier.findById(supplierId);
         if (!nhaCungCap) {
@@ -212,44 +247,40 @@ const capNhatSanPham = async (req, res) => {
             message: `Nhà cung cấp với ID "${supplierId}" không tồn tại.`,
           });
         }
+        sanPhamHienTai.supplierId = supplierId;
       }
     }
 
-    // Cập nhật từng trường nếu có giá trị mới.
     if (name !== undefined) sanPhamHienTai.name = name;
     if (sku !== undefined) sanPhamHienTai.sku = sku.trim().toUpperCase();
     if (quantity !== undefined) sanPhamHienTai.quantity = quantity;
     if (minQuantity !== undefined) sanPhamHienTai.minQuantity = minQuantity;
-    if (supplierId !== undefined) sanPhamHienTai.supplierId = supplierId || null;
     if (location !== undefined) sanPhamHienTai.location = location;
 
     await sanPhamHienTai.save();
 
-    const sanPhamCapNhat = await Product.findById(id).populate('supplierId', 'name contactName phone');
+    const sanPhamCapNhat = await Product.findById(id)
+      .populate('supplierId', 'name contactName phone');
 
     return res.status(200).json({
       success: true,
       message: 'Cập nhật sản phẩm thành công.',
       data: sanPhamCapNhat,
     });
-
   } catch (err) {
     console.error('[Product Controller] Lỗi capNhatSanPham:', err.message);
-
     if (err.code === 11000) {
       return res.status(409).json({
         success: false,
         message: 'Mã SKU đã tồn tại trong hệ thống.',
       });
     }
-
     if (err.name === 'CastError') {
       return res.status(400).json({
         success: false,
         message: `ID sản phẩm không hợp lệ: ${req.params.id}.`,
       });
     }
-
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map((e) => e.message);
       return res.status(400).json({
@@ -257,7 +288,6 @@ const capNhatSanPham = async (req, res) => {
         message: messages.join('; '),
       });
     }
-
     return res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật sản phẩm.',
@@ -265,12 +295,10 @@ const capNhatSanPham = async (req, res) => {
   }
 };
 
-/**
+/* =========================================================
  * DELETE /api/products/:id
- * Xóa một sản phẩm khỏi kho theo ID.
- * Chỉ tài khoản Admin mới có quyền thực hiện (authorize('Admin') ở route).
- * Xóa thành công thì trả về thông tin sản phẩm đã xóa.
- */
+ * Xóa một sản phẩm khỏi kho (Admin only).
+ * ========================================================= */
 const xoaSanPham = async (req, res) => {
   try {
     const { id } = req.params;
@@ -289,17 +317,14 @@ const xoaSanPham = async (req, res) => {
       message: 'Xóa sản phẩm thành công.',
       data: sanPhamDaXoa,
     });
-
   } catch (err) {
     console.error('[Product Controller] Lỗi xoaSanPham:', err.message);
-
     if (err.name === 'CastError') {
       return res.status(400).json({
         success: false,
         message: `ID sản phẩm không hợp lệ: ${req.params.id}.`,
       });
     }
-
     return res.status(500).json({
       success: false,
       message: 'Lỗi server khi xóa sản phẩm.',
