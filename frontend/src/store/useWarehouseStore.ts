@@ -3,7 +3,7 @@ import { create } from "zustand";
 import axios from "axios";
 import { getApiErrorMessage } from "@/lib/apiError";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export type MutationResult =
   | { ok: true }
@@ -33,7 +33,7 @@ const clearAuthAndRedirect = () => {
   }
 };
 
-interface Product {
+export interface Product {
   _id: string;
   name: string;
   sku: string;
@@ -44,6 +44,20 @@ interface Product {
   createdAt?: string;
   updatedAt?: string;
   trangThaiTonKho?: string;
+}
+
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export interface PaginatedProducts {
+  products: Product[];
+  pagination: PaginationInfo;
 }
 
 interface Transaction {
@@ -57,6 +71,7 @@ interface Transaction {
 
 interface WarehouseState {
   products: Product[];
+  pagination: PaginationInfo | null;
   transactions: Transaction[];
   isLoading: boolean;
   addInventoryTransaction: (data: {
@@ -64,7 +79,11 @@ interface WarehouseState {
     type: "Import" | "Export";
     quantity: number;
   }) => Promise<MutationResult>;
-  fetchProducts: () => Promise<void>;
+  fetchProducts: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => Promise<PaginatedProducts>;
   fetchTransactions: () => Promise<void>;
   addProduct: (product: Omit<Product, "_id">) => Promise<MutationResult>;
   updateProduct: (id: string, product: Partial<Product>) => Promise<boolean>;
@@ -73,6 +92,7 @@ interface WarehouseState {
 
 export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   products: [],
+  pagination: null,
   transactions: [],
   isLoading: false,
 
@@ -99,16 +119,33 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
     }
   },
 
-  fetchProducts: async () => {
+  fetchProducts: async (params = {}) => {
     set({ isLoading: true });
     try {
-      const response = await axios.get(`${API_URL}/products`, {
+      const { page = 1, limit = 20, search = "" } = params;
+      const query = new URLSearchParams();
+      query.append("page", String(page));
+      query.append("limit", String(limit));
+      if (search) query.append("search", search);
+
+      const response = await axios.get(`${API_URL}/products?${query.toString()}`, {
         headers: getAuthHeader(),
       });
-      if (response.data?.success) set({ products: response.data.data || [] });
+
+      if (response.data?.success) {
+        const productsData = response.data.data || [];
+        const paginationData = response.data.pagination || null;
+        set({ products: productsData, pagination: paginationData });
+        return { products: productsData, pagination: paginationData };
+      }
+
+      set({ products: [], pagination: null });
+      return { products: [], pagination: null };
     } catch (error: any) {
       console.error("Lỗi fetchProducts:", error);
       if (error.response?.status === 401) clearAuthAndRedirect();
+      set({ products: [], pagination: null });
+      return { products: [], pagination: null };
     } finally {
       set({ isLoading: false });
     }

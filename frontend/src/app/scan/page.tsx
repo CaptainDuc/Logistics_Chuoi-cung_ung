@@ -2,13 +2,17 @@
 
 import QRScanner from "./QRScanner";
 import { exportToExcel } from "@/utils/exportExcel";
+import { backendFetch } from "@/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 export default function ScanPage() {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanData, setScanData] = useState<any[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const router = useRouter();
 
   // 1. Load data lịch sử từ localStorage khi vào trang
   useEffect(() => {
@@ -35,7 +39,7 @@ export default function ScanPage() {
     const verifyProductWithBackend = async () => {
       try {
         // Gọi API đến Backend để kiểm tra mã SKU vừa quét được
-        const response = await fetch(`http://localhost:4000/api/products/${scanResult}`);
+        const response = await backendFetch(`api/products/${scanResult}`);
         
         if (!response.ok) {
           throw new Error("Không tìm thấy sản phẩm trong hệ thống");
@@ -91,7 +95,15 @@ export default function ScanPage() {
       {/* TOP BAR */}
       <header className="sticky top-0 z-40 w-full border-b border-white/5 bg-[#080c1e]/70 backdrop-blur-2xl shadow-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 h-24">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-5">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-cyan-300 transition-all"
+            >
+              <ArrowLeft size={15} />
+              Quay về Dashboard
+            </button>
+            <div className="h-6 w-px bg-white/10" />
             <div className="relative h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-black">
               ⚡
             </div>

@@ -17,7 +17,6 @@ interface AddProductModalProps {
   onSuccess?: () => void;
 }
 
-// Danh sách các vị trí kệ kho mẫu cố định để chọn lựa
 const STORAGE_LOCATIONS = [
   "Kệ A1 - Tầng 1",
   "Kệ A2 - Tầng 2",
@@ -32,12 +31,10 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
   const { products, addProduct } = useWarehouseStore();
   const toast = useToastStore((s) => s.show);
 
-  // ✅ ĐÚNG: Tính toán danh sách vị trí đã bận dựa trên dữ liệu state mới nhất của store
   const busyLocations = products
     .filter((p) => (Number(p.quantity) || 0) > 0)
     .map((p) => p.location?.trim());
 
-  // Lọc ra các vị trí còn trống để hiển thị lên thẻ <select>
   const availableLocations = STORAGE_LOCATIONS.filter(
     (loc) => !busyLocations.includes(loc.trim())
   );
@@ -45,13 +42,25 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  // Mặc định chọn vị trí trống đầu tiên nếu có, nếu không thì lấy giá trị mặc định hệ thống
   const [location, setLocation] = useState(
     availableLocations[0] || STORAGE_LOCATIONS[0]
   );
   const [quantity, setQuantity] = useState(1);
   const [minQuantity, setMinQuantity] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleOpen = () => {
+    const defaultLoc = availableLocations[0] || STORAGE_LOCATIONS[0];
+    setLocation(defaultLoc);
+    setName("");
+    setQuantity(1);
+    setMinQuantity(5);
+    const prefix = "SKU";
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+    setSku(`${prefix}-${timestamp}-${randomStr}`);
+    setIsOpen(true);
+  };
 
   const handleGenerateSKU = () => {
     const prefix = "SKU";
@@ -83,16 +92,10 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
         return;
       }
 
-      setName("");
-      // Cập nhật lại vị trí mặc định sau khi reset form
-      setLocation(availableLocations[0] || STORAGE_LOCATIONS[0]);
-      setQuantity(1);
-      setMinQuantity(5);
+      toast("Đã thêm sản phẩm thành công.", "success");
       setIsOpen(false);
 
       if (onSuccess) onSuccess();
-
-      toast("Đã thêm sản phẩm thành công.", "success");
     } catch (error) {
       console.error("Lỗi khi thêm sản phẩm:", error);
       toast("Không thể lưu sản phẩm. Vui lòng thử lại.", "error");
@@ -104,151 +107,263 @@ export default function AddProductModal({ onSuccess }: AddProductModalProps) {
   return (
     <>
       <button
-        onClick={() => {
-          setIsOpen(true);
-          handleGenerateSKU();
-          // Cập nhật lại vị trí hợp lệ khi mở modal lên
-          if (availableLocations.length > 0) {
-            setLocation(availableLocations[0]);
-          }
-        }}
-        className="flex items-center gap-2 bg-slate-900 text-white font-medium px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-all active:scale-95 text-sm shadow-sm"
+        onClick={handleOpen}
+        className="btn btn-primary"
       >
-        <Plus className="w-4 h-4" /> Thêm sản phẩm
+        <Plus size={15} /> Thêm sản phẩm
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[4px]">
-          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl p-6 relative animate-in fade-in zoom-in-95 duration-150 text-slate-800">
-            <button
-              onClick={() => setIsOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                Thêm sản phẩm mới
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Vật tư mới sẽ được cấp mã định danh QR tự động ngay sau khi tạo.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Tên sản phẩm */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Package className="w-3.5 h-3.5" /> Tên sản phẩm / Vật tư
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nhập tên sản phẩm..."
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-slate-50/50"
-                />
-              </div>
-
-              {/* Mã SKU (Tự động sinh) */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Hash className="w-3.5 h-3.5" /> Mã định danh SKU (Hệ thống tự
-                  tạo)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={sku}
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-slate-100 text-slate-600 cursor-not-allowed font-mono font-medium focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleGenerateSKU}
-                    className="px-3 text-xs font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsOpen(false)}>
+          <div className="modal-panel">
+            {/* Header */}
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 4px 16px rgba(99,102,241,0.35)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Package size={16} color="#fff" />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: "var(--text-primary)",
+                      letterSpacing: "-0.01em",
+                    }}
                   >
-                    Đổi mã
-                  </button>
+                    Thêm sản phẩm mới
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    Vật tư được cấp mã QR tự động ngay sau khi tạo
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  fontSize: 13,
+                }}
+                onMouseEnter={(e) => {
+                  const t = e.currentTarget;
+                  t.style.background = "rgba(255,255,255,0.1)";
+                  t.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  const t = e.currentTarget;
+                  t.style.background = "rgba(255,255,255,0.05)";
+                  t.style.color = "var(--text-muted)";
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
-              {/* Vị trí kệ kho */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" /> Vị trí xếp kệ
-                </label>
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-slate-50/50 cursor-pointer text-slate-700"
-                >
-                  {availableLocations.length > 0 ? (
-                    availableLocations.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
+            {/* Body */}
+            <div className="modal-body" style={{ padding: "20px 24px" }}>
+              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* Tên sản phẩm */}
+                <div>
+                  <label
+                    className="form-label"
+                    style={{ marginBottom: 6 }}
+                  >
+                    <Package size={11} />
+                    Tên sản phẩm / Vật tư
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nhập tên sản phẩm..."
+                    className="form-input"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Mã SKU */}
+                <div>
+                  <label className="form-label" style={{ marginBottom: 6 }}>
+                    <Hash size={11} />
+                    Mã định danh SKU
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={sku}
+                      className="form-input"
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 13,
+                        letterSpacing: "0.02em",
+                        flex: 1,
+                        cursor: "not-allowed",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateSKU}
+                      style={{
+                        padding: "0 14px",
+                        borderRadius: 10,
+                        background: "rgba(99,102,241,0.1)",
+                        border: "1px solid rgba(99,102,241,0.25)",
+                        color: "#818cf8",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        const t = e.currentTarget;
+                        t.style.background = "rgba(99,102,241,0.2)";
+                        t.style.borderColor = "rgba(99,102,241,0.4)";
+                      }}
+                      onMouseLeave={(e) => {
+                        const t = e.currentTarget;
+                        t.style.background = "rgba(99,102,241,0.1)";
+                        t.style.borderColor = "rgba(99,102,241,0.25)";
+                      }}
+                    >
+                      Đổi mã
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vị trí kệ */}
+                <div>
+                  <label className="form-label" style={{ marginBottom: 6 }}>
+                    <MapPin size={11} />
+                    Vị trí xếp kệ
+                  </label>
+                  <select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="form-input"
+                    style={{ cursor: "pointer" }}
+                  >
+                    {availableLocations.length > 0 ? (
+                      availableLocations.map((loc) => (
+                        <option key={loc} value={loc} style={{ background: "#111827" }}>
+                          {loc}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled value="" style={{ background: "#111827" }}>
+                        Kho đã hết vị trí trống
                       </option>
-                    ))
-                  ) : (
-                    <option disabled value="">
-                      Kho đã hết vị trí trống
-                    </option>
-                  )}
-                </select>
-              </div>
+                    )}
+                  </select>
+                </div>
 
-              {/* Số lượng nhập kho ban đầu */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5" /> Số lượng nhập kho ban đầu
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  placeholder="Nhập số lượng ban đầu..."
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-slate-50/50 font-mono"
-                />
-              </div>
+                {/* Số lượng + Ngưỡng */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: 6 }}>
+                      <Layers size={11} />
+                      Số lượng nhập
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      required
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className="form-input"
+                      style={{ fontFamily: "monospace", textAlign: "center" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: 6 }}>
+                      <AlertCircle size={11} />
+                      Ngưỡng cảnh báo
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={minQuantity}
+                      onChange={(e) => setMinQuantity(Number(e.target.value))}
+                      className="form-input"
+                      style={{ fontFamily: "monospace", textAlign: "center" }}
+                    />
+                  </div>
+                </div>
 
-              {/* Ngưỡng tồn tối thiểu */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" /> Ngưỡng cảnh báo hết
-                  hàng (Min Qty)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  required
-                  value={minQuantity}
-                  onChange={(e) => setMinQuantity(Number(e.target.value))}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-slate-50/50 font-mono"
-                />
-              </div>
-
-              {/* Nhóm nút hành động */}
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                {/* Actions */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    paddingTop: 4,
+                    borderTop: "1px solid var(--border-subtle)",
+                    marginTop: 4,
+                  }}
                 >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || availableLocations.length === 0}
-                  className="px-4 py-2 text-sm font-medium bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
-                >
-                  {isSubmitting ? "Đang lưu..." : "Xác nhận tạo"}
-                </button>
-              </div>
-            </form>
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    disabled={isSubmitting}
+                    className="btn btn-ghost"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || availableLocations.length === 0}
+                    className="btn btn-primary"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span
+                          style={{
+                            width: 13,
+                            height: 13,
+                            border: "2px solid rgba(255,255,255,0.3)",
+                            borderTopColor: "#fff",
+                            borderRadius: "50%",
+                            display: "inline-block",
+                            animation: "spin-smooth 0.7s linear infinite",
+                          }}
+                        />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} />
+                        Xác nhận tạo
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

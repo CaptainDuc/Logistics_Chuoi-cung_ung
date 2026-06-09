@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import QRCode from "qrcode";
 
 interface ProductQRProps {
@@ -10,19 +10,20 @@ interface ProductQRProps {
 
 export default function ProductQR({ sku, name }: ProductQRProps) {
   const [qrSrc, setQrSrc] = useState<string>("");
+  const [hovered, setHovered] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sku) return;
 
-    // Chuyển đổi mã SKU thành chuỗi ảnh Base64 trực tiếp bằng trình duyệt
     QRCode.toDataURL(
       sku,
       {
         width: 110,
         margin: 1,
         color: {
-          dark: "#0F172A", // Màu các khối mã QR (Slate 900)
-          light: "#FFFFFF", // Màu nền trắng
+          dark: "#0F172A",
+          light: "#FFFFFF",
         },
       },
       (err, url) => {
@@ -35,27 +36,98 @@ export default function ProductQR({ sku, name }: ProductQRProps) {
     );
   }, [sku]);
 
-  // Trong lúc chờ sinh mã QR, hiển thị khung loading giả lập (Skeleton) để tránh vỡ khung
   if (!qrSrc) {
     return (
-      <div className="w-[95px] h-[95px] bg-slate-100 animate-pulse rounded-xl border border-slate-200" />
+      <div
+        style={{
+          width: 95,
+          height: 95,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: 12,
+          animation: "pulse 1.5s ease-in-out infinite",
+        }}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center bg-white p-1.5 border border-slate-200 rounded-xl shadow-sm group relative">
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#fff",
+        padding: 6,
+        borderRadius: 12,
+        border: "1px solid var(--border-subtle)",
+        position: "relative",
+        cursor: "default",
+        transform: hovered ? "scale(1.04)" : "scale(1)",
+        boxShadow: hovered
+          ? "0 8px 24px rgba(0,0,0,0.4)"
+          : "0 2px 8px rgba(0,0,0,0.15)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+      }}
+    >
       <img
         src={qrSrc}
         alt={`QR Code ${name}`}
-        className="w-24 h-24 object-contain"
+        style={{
+          width: 96,
+          height: 96,
+          objectFit: "contain",
+          display: "block",
+        }}
       />
-      <span className="text-[10px] font-mono font-semibold text-slate-500 mt-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 select-all">
+      <span
+        style={{
+          fontSize: 9,
+          fontFamily: "monospace",
+          fontWeight: 600,
+          color: "#64748b",
+          marginTop: 4,
+          background: "#f8fafc",
+          padding: "1px 5px",
+          borderRadius: 4,
+          border: "1px solid #e2e8f0",
+          userSelect: "all",
+          letterSpacing: "0.02em",
+        }}
+      >
         {sku}
       </span>
 
-      {/* Hiệu ứng hiển thị nhẹ chữ "Mã SKU" khi thủ kho rê chuột vào vùng mã QR */}
-      <div className="absolute inset-0 bg-slate-900/5 backdrop-blur-[0.5px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-        <span className="bg-slate-900 text-white text-[9px] font-bold px-2 py-0.5 rounded-md shadow">
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(15,23,42,0.82)",
+          backdropFilter: "blur(2px)",
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: hovered ? 1 : 0,
+          transition: "opacity 0.2s ease",
+        }}
+      >
+        <span
+          style={{
+            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            color: "#fff",
+            fontSize: 9,
+            fontWeight: 700,
+            padding: "3px 8px",
+            borderRadius: 6,
+            letterSpacing: "0.05em",
+            boxShadow: "0 2px 8px rgba(99,102,241,0.5)",
+          }}
+        >
           QUÉT MÃ
         </span>
       </div>

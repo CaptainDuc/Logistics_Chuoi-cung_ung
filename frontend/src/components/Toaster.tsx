@@ -7,18 +7,21 @@ function toastStyles(type: ToastType) {
   switch (type) {
     case "success":
       return {
-        wrap: "border-emerald-200 bg-emerald-50 text-emerald-900",
-        icon: <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />,
+        icon: "#34d399",
+        iconBg: "rgba(16,185,129,0.12)",
+        iconBorder: "rgba(16,185,129,0.25)",
       };
     case "error":
       return {
-        wrap: "border-rose-200 bg-rose-50 text-rose-900",
-        icon: <XCircle className="w-5 h-5 text-rose-600 shrink-0" />,
+        icon: "#fb7185",
+        iconBg: "rgba(244,63,94,0.12)",
+        iconBorder: "rgba(244,63,94,0.25)",
       };
     default:
       return {
-        wrap: "border-slate-200 bg-white text-slate-900",
-        icon: <Info className="w-5 h-5 text-slate-500 shrink-0" />,
+        icon: "#818cf8",
+        iconBg: "rgba(99,102,241,0.12)",
+        iconBorder: "rgba(99,102,241,0.25)",
       };
   }
 }
@@ -30,27 +33,67 @@ export function Toaster() {
   if (toasts.length === 0) return null;
 
   return (
-    <div
-      className="fixed bottom-4 right-4 z-[100] flex max-w-[min(420px,calc(100vw-2rem))] flex-col gap-2 pointer-events-none"
-      aria-live="polite"
-    >
+    <div className="toaster-container">
       {toasts.map((t) => {
-        const { wrap, icon } = toastStyles(t.type);
+        const { icon, iconBg, iconBorder } = toastStyles(t.type);
         return (
-          <div
-            key={t.id}
-            role="status"
-            className={`pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg shadow-slate-900/10 ${wrap}`}
-          >
-            {icon}
-            <p className="text-sm font-medium leading-snug flex-1">{t.message}</p>
+          <div key={t.id} role="status" className={`toast-item toast-${t.type}`}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 9,
+                background: iconBg,
+                border: `1px solid ${iconBorder}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {t.type === "success" ? (
+                <CheckCircle2 size={16} color={icon} />
+              ) : t.type === "error" ? (
+                <XCircle size={16} color={icon} />
+              ) : (
+                <Info size={16} color={icon} />
+              )}
+            </div>
+            <p className="text-sm font-medium flex-1" style={{ lineHeight: 1.5 }}>
+              {t.message}
+            </p>
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="rounded-lg p-1 text-current opacity-60 hover:opacity-100 transition-opacity"
+              style={{
+                width: 24,
+                height: 24,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 7,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                flexShrink: 0,
+                fontSize: 12,
+                padding: 0,
+              }}
+              onMouseEnter={(e) => {
+                const b = e.currentTarget;
+                b.style.background = "rgba(255,255,255,0.12)";
+                b.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                const b = e.currentTarget;
+                b.style.background = "rgba(255,255,255,0.06)";
+                b.style.color = "var(--text-muted)";
+              }}
               aria-label="Đóng"
             >
-              <X className="w-4 h-4" />
+              <X size={13} />
             </button>
           </div>
         );
