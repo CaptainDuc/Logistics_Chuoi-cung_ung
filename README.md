@@ -1,155 +1,100 @@
-# WHFlow Nexus Pro — Hệ Thống Quản Lý Kho
+# 📦 Hệ Thống Quản Lý Kho Hàng Nexus (Nexus Warehouse Management)
 
-Hệ thống quản lý kho hàng hiện đại, theo dõi nhập/xuất hàng, quét QR, xuất báo cáo Excel và phân quyền người dùng.
-
----
-
-## Tính năng chính
-
-| Tính năng | Mô tả |
-|---|---|
-| **Quản lý sản phẩm** | CRUD đầy đủ — thêm, sửa, xóa, xem chi tiết sản phẩm theo SKU |
-| **Quản lý kho** | Nhập kho / Xuất kho — tự động cập nhật tồn kho, cảnh báo sắp hết |
-| **Quét QR/SKU** | Trang `/scan` dùng camera quét mã vạch, đối chiếu real-time với backend |
-| **Nhật ký kho** | Lịch sử đầy đủ các phiên nhập/xuất, ai làm gì, lúc nào |
-| **Quản lý người dùng** | Đăng nhập JWT, phân quyền Admin / User, khóa tài khoản |
-| **Xuất báo cáo Excel** | Export danh sách sản phẩm / lịch sử kho ra `.xlsx` |
-| **Responsive UI** | Giao diện dark-themed, hoạt động tốt trên desktop lẫn mobile |
+Chào mừng bạn đến với dự án Hệ thống Quản lý Kho hàng thông minh. Dự án này bao gồm hai ứng dụng Frontend chuyên biệt nhằm tối ưu hóa quy trình làm việc trong kho hàng hiện đại.
 
 ---
 
-## Cấu trúc thư mục
+## 🌟 Tổng Quan Dự Án
 
-```
-Logistics_Chuoi-cung_ung/
-├── backend/                  # Node.js + Express + MongoDB (cổng 5000)
-│   ├── seed.js              # Script seed dữ liệu mẫu
-│   ├── server.js            # Entry point
-│   └── src/
-│       ├── config/           # db.js (MongoDB), swagger.js
-│       ├── controllers/      # Logic nghiệp vụ
-│       ├── middleware/       # auth, role guard
-│       ├── models/           # User, Product, Supplier, InventoryLog
-│       └── routes/           # /api/auth, /api/products, /api/inventory, /api/users
-│
-└── frontend/                # Next.js 15 App Router (cổng 3000)
-    └── src/
-        ├── app/
-        │   ├── (auth)/login/     # Trang đăng nhập
-        │   ├── dashboard/       # Trang chính (products, inbound, outbound, users)
-        │   └── scan/            # Trang quét QR/SKU
-        ├── components/         # UI dùng chung
-        ├── lib/                # api.ts, authRole.ts
-        └── store/              # Zustand stores
-```
+Hệ thống được thiết kế theo phong cách **Glassmorphism Premium**, mang lại trải nghiệm người dùng cao cấp, mượt mà và trực quan.
+
+### 🌓 1. Web Application (Quản lý & Giám sát)
+- **Mục tiêu:** Dành cho quản lý kho tại văn phòng.
+- **Tính năng chính:**
+    - Dashboard thống kê dữ liệu trực quan.
+    - Quản lý danh mục vật tư, tồn kho.
+    - Theo dõi lịch sử nhập/xuất kho.
+    - Xuất báo cáo Excel định kỳ.
+
+### 📱 2. Mobile Application (Vận hành hiện trường)
+- **Mục tiêu:** Dành cho nhân viên kho di chuyển trong hiện trường.
+- **Tính năng chính:**
+    - **SmartScan QR:** Quét mã SKU nhanh chóng bằng camera.
+    - Giao diện Mobile-First với các thẻ hành động lớn.
+    - Thanh điều hướng Bottom Navigation linh hoạt.
+    - Hiệu ứng chuyển động mượt mà bằng Framer Motion.
 
 ---
 
-## Cách chạy
+## 🛠️ Công Nghệ Sử Dụng
 
-### 1. Chuẩn bị
+- **Frontend:** Next.js 14+, React, Tailwind CSS.
+- **Animations:** Framer Motion, Lucide React Icons.
+- **State Management:** Zustand.
+- **Data Handling:** ExcelJS.
 
-- Node.js 18+
-- MongoDB Atlas (hoặc MongoDB cục bộ)
+---
 
-### 2. Backend
+## 🚀 Hướng Dẫn Cài Đặt & Chạy Code
 
+### Bước 1: Clone dự án
 ```bash
-cd backend
+git clone <url-github-cua-ban>
+cd demo
+```
+
+### Bước 2: Cài đặt và Chạy Web App
+Cần cài đặt dependencies cho từng ứng dụng:
+```bash
+cd web-app
 npm install
-
-# Sao chép và chỉnh .env
-#   MONGO_URI, JWT_SECRET, JWT_REFRESH_SECRET, PORT=5000
-
-npm start
-# Backend chạy tại http://localhost:5000
-```
-
-### 3. Seed dữ liệu mẫu
-
-```bash
-cd backend
-node seed.js
-```
-
-Script sẽ xóa toàn bộ dữ liệu cũ và nạp mới:
-
-| Thực thể | Số lượng |
-|---|---|
-| Người dùng | 4 tài khoản |
-| Nhà cung cấp | 4 công ty |
-| Sản phẩm | 18 sản phẩm (8 danh mục, 9 khu kho A→I) |
-| Nhật ký kho | ~29 phiếu nhập + ~11 phiếu xuất |
-
-### 4. Frontend
-
-```bash
-cd frontend
-npm install
-
-# Tạo .env.local
-#   NEXT_PUBLIC_API_URL=http://localhost:5000/api
-
 npm run dev
-# Frontend chạy tại http://localhost:3000
+# Mở trình duyệt tại: http://localhost:3000
+```
+
+### Bước 3: Cài đặt và Chạy Mobile App
+```bash
+cd ../mobile-app
+npm install
+npm run dev
+# Mở trình duyệt tại: http://localhost:3001
 ```
 
 ---
 
-## Tài khoản demo
+## 📤 Hướng dẫn đẩy Code lên GitHub (Chỉ đẩy Web & Mobile)
 
-| Username | Password | Role |
-|---|---|---|
-| `ducthinh` | `123456` | Admin |
-| `nvkho_tuan` | `123456` | User |
-| `nvkho_huong` | `123456` | User |
-| `nv_nghisv` | `123456` | User (bị khóa) |
+Lưu ý: Tôi đã cấu hình file `.gitignore` để tự động loại bỏ thư mục `backend`. Bạn chỉ cần thực hiện các lệnh sau:
 
----
+1. **Khởi tạo Git (nếu chưa có):**
+   ```bash
+   git init
+   ```
 
-## Một số SKU để test quét QR
+2. **Kiểm tra trạng thái:** (Bạn sẽ thấy `backend/` không xuất hiện trong danh sách)
+   ```bash
+   git status
+   ```
 
-```
-LAP-DELL-XP13P-001   LAP-APPL-MBA2-002
-MOU-LOGI-MX3S-003   MOU-RAZR-DAV3-004
-KEY-KEYC-K8P-005    KEY-CORS-K70P-006
-MON-LG-27U60-007    MON-SAMS-G732-008
-EAR-SONY-XM5-009    EAR-APPL-APP2-010
-CAM-LOGI-BRIO-011   CAM-RAZR-KYU-012
-NET-ASUS-AX88-013   NET-TPLI-POE24-014
-SSD-SAMS-990P-015   HDD-WD-PURP-016
-DOC-CALD-TS4-017    HUB-ANKE-A7U3-018
-```
+3. **Add và Commit:**
+   ```bash
+   git add .
+   description: "feat: hoàn thiện giao diện Premium cho Web & Mobile"
+   git commit -m "feat: hoàn thiện giao diện Premium cho Web & Mobile"
+   ```
 
----
-
-## API Endpoints
-
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| POST | `/api/auth/login` | Đăng nhập |
-| POST | `/api/auth/refresh` | Refresh token |
-| POST | `/api/auth/logout` | Đăng xuất |
-| GET | `/api/products` | Danh sách sản phẩm |
-| POST | `/api/products` | Thêm sản phẩm (Admin) |
-| PUT | `/api/products/:id` | Sửa sản phẩm (Admin) |
-| DELETE | `/api/products/:id` | Xóa sản phẩm (Admin) |
-| GET | `/api/inventory` | Nhật ký nhập/xuất |
-| POST | `/api/inventory` | Tạo phiếu nhập/xuất |
-| GET | `/api/users` | Danh sách user (Admin) |
-
-Swagger UI: `http://localhost:5000/api-docs`
+4. **Kết nối repository và Push:**
+   ```bash
+   git remote add origin <url-repository-cua-ban>
+   git branch -M main
+   git push -u origin main
+   ```
 
 ---
 
-## Tech stack
-
-**Frontend:** Next.js 15 (App Router), Tailwind CSS 4, Zustand, Lucide React, React Hook Form + Zod, Framer Motion, XLSX
-
-**Backend:** Node.js, Express, MongoDB + Mongoose, JWT + Bcrypt, Nodemailer
+## 📝 Lưu Ý
+- Thư mục `backend` được giữ lại local để bảo mật logic xử lý. 
+- Đảm bảo bạn đã cấu hình biến môi trường `NEXT_PUBLIC_API_URL` trong các file `.env` nếu cần kết nối với Server thực tế.
 
 ---
-
-## Người thực hiện
-
-Dự án được phát triển bởi nhóm **ducthinhn & minhduc & ducan** — 2026.
+*Dự án được phát triển bởi Antigravity AI.*
