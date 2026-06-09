@@ -1,52 +1,3 @@
-<<<<<<< HEAD
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { ketNoiMongoDB } = require('./src/config/db');
-const authRoutes = require('./src/routes/authRoutes');
-const productRoutes = require('./src/routes/productRoutes');
-const inventoryRoutes = require('./src/routes/inventoryRoutes');
-
-const app = express();
-const PORT = process.env.PORT || 4000;
-const originList = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((item) => item.trim()) : ['*'];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || originList.includes('*') || originList.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked origin: ${origin}`));
-      }
-    },
-    credentials: true,
-  }),
-);
-app.use(express.json());
-
-app.get('/', (_req, res) => {
-  res.json({ message: 'Logistics QR Backend is running.' });
-});
-
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/inventory', inventoryRoutes);
-
-app.use((err, _req, res, _next) => {
-  console.error('[Server] Lỗi middleware:', err.message);
-  res.status(500).json({ success: false, message: 'Lỗi server nội bộ.' });
-});
-
-const startServer = async () => {
-  try {
-    await ketNoiMongoDB();
-    app.listen(PORT, () => {
-      console.log(`[Server] Backend server đang chạy tại http://localhost:${PORT}`);
-    });
-  } catch (err) {
-    console.error('[Server] Khởi động thất bại:', err.message);
-=======
 /**
  * =========================================================
  * FILE CHẠY CHÍNH CỦA HỆ THỐNG QUẢN LÝ KHO HÀNG - PTIT
@@ -68,7 +19,6 @@ const express = require("express");
 const cors = require("cors");
 const { ketNoiMongoDB } = require("./src/config/db");
 
-// Import các router đã định tuyến.
 const authRoutes = require("./src/routes/authRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const inventoryRoutes = require("./src/routes/inventoryRoutes");
@@ -79,8 +29,6 @@ const app = express();
 // MIDDLEWARE CẤU HÌNH
 // =========================================================
 
-// Cho phép frontend (React / Vue / Angular) gọi API từ domain khác.
-// Cấu hình origin linh hoạt: nếu có ALLOWED_ORIGINS trong .env thì dùng, không thì cho phép tất cả.
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGINS
@@ -92,13 +40,9 @@ app.use(
   })
 );
 
-// Parse body dạng JSON khi client gửi request lên.
 app.use(express.json({ limit: "10mb" }));
-
-// Parse body dạng URL-encoded (ít dùng hơn nhưng vẫn hỗ trợ).
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware log mỗi request vào console (tiện debug khi phát triển).
 app.use((req, res, next) => {
   const thoiGian = new Date().toLocaleString("vi-VN", {
     timeZone: "Asia/Ho_Chi_Minh",
@@ -111,8 +55,6 @@ app.use((req, res, next) => {
 // HEALTH CHECK
 // =========================================================
 
-// Endpoint kiểm tra server còn sống hay không.
-// Dùng để frontend hoặc load balancer gọi, không cần xác thực.
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -178,11 +120,9 @@ const khoiDongServer = async () => {
     console.log("   HỆ THỐNG QUẢN LÝ KHO HÀNG - PTIT    ");
     console.log("========================================\n");
 
-    // Bước 1: Kết nối MongoDB.
     console.log("[Server] Đang kết nối MongoDB...");
     await ketNoiMongoDB();
 
-    // Bước 2: Khởi động HTTP server.
     const server = app.listen(PORT, () => {
       console.log(`[Server] ✅ HTTP Server đang lắng nghe trên cổng: ${PORT}`);
       console.log(`[Server] 🌐 Health check: http://localhost:${PORT}/health`);
@@ -200,13 +140,10 @@ const khoiDongServer = async () => {
       console.log("            DELETE /api/products/:id  (Admin only)");
       console.log("  Inventory: POST   /api/inventory/scan");
       console.log("            GET    /api/inventory/logs");
-      console.log(
-        "            GET    /api/inventory/export-excel  (Admin only)"
-      );
+      console.log("            GET    /api/inventory/export-excel  (Admin only)");
       console.log("========================================\n");
     });
 
-    // Xử lý tắt server graceful (không bị treo khi Ctrl+C).
     const tatServer = async (signal) => {
       console.log(`\n[Server] 📛 Nhận tín hiệu ${signal}. Đang tắt server...`);
       server.close(async () => {
@@ -219,7 +156,6 @@ const khoiDongServer = async () => {
         process.exit(0);
       });
 
-      // Force quit sau 10s nếu chưa tắt được.
       setTimeout(() => {
         console.error("[Server] ❌ Không thể đóng gracefully. Force quit.");
         process.exit(1);
@@ -231,13 +167,8 @@ const khoiDongServer = async () => {
   } catch (err) {
     console.error("[Server] ❌ KHÔNG THỂ KHỞI ĐỘNG SERVER!");
     console.error(`[Server] Lỗi: ${err.message}`);
->>>>>>> main
     process.exit(1);
   }
 };
 
-<<<<<<< HEAD
-startServer();
-=======
 khoiDongServer();
->>>>>>> main

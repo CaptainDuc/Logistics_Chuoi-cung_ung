@@ -49,7 +49,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Tìm user, bao gồm cả trường password (select: false nên cần +password).
     const user = await User.findOne({ username }).select('+password');
     if (!user) {
       return res.status(401).json({
@@ -58,7 +57,6 @@ const login = async (req, res) => {
       });
     }
 
-    // So sánh mật khẩu bằng bcrypt.
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(401).json({
@@ -67,11 +65,9 @@ const login = async (req, res) => {
       });
     }
 
-    // Tạo token.
     const accessToken = AccessToken(user._id, user.role);
     const refreshToken = RefreshToken(user._id);
 
-    // Lưu refreshToken vào DB để quản lý phiên.
     user.refreshToken = refreshToken;
     await user.save();
 
@@ -103,7 +99,7 @@ const login = async (req, res) => {
  * Làm mới Access Token bằng Refresh Token.
  * Kiểm tra token hợp lệ và đối chiếu với refreshToken trong DB.
  */
-const refreshToken = async (req, res) => {
+const refreshTokenFn = async (req, res) => {
   try {
     const { refreshToken: clientToken } = req.body;
 
@@ -114,7 +110,6 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    // Giải mã refreshToken.
     let decoded;
     try {
       const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
@@ -126,7 +121,6 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    // Tìm user và đối chiếu refreshToken trong DB.
     const user = await User.findById(decoded.userId).select('+refreshToken');
     if (!user) {
       return res.status(401).json({
@@ -142,12 +136,7 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    // Tạo AccessToken mới.
-<<<<<<< HEAD
     const accessToken = AccessToken(user._id, user.role);
-=======
-    const accessToken = taoAccessToken(user._id, user.role);
->>>>>>> main
 
     return res.status(200).json({
       success: true,
@@ -173,8 +162,6 @@ const refreshToken = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    // Lấy userId từ token đã được giải mã (nhờ middleware protect ở route).
-    // Tuy nhiên, logout có thể được gọi kèm token hoặc không.
     const authHeader = req.headers.authorization;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -203,6 +190,6 @@ const logout = async (req, res) => {
 
 module.exports = {
   login,
-  refreshToken,
+  refreshToken: refreshTokenFn,
   logout,
 };
