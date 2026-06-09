@@ -152,4 +152,4 @@ Swagger UI: `http://localhost:5000/api-docs`
 
 ## Người thực hiện
 
-Dự án được phát triển bởi **ducthinh** — 2026.
+Dự án được phát triển bởi nhóm **ducthinhn & minhduc & ducan** — 2026.
