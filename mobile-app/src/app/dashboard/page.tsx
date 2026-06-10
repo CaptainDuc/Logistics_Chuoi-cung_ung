@@ -31,6 +31,12 @@ export default function DashboardPage() {
   const { adminName } = useAdminStore();
 
   useEffect(() => {
+    // Chỉ fetch dữ liệu khi đang ở route dashboard (tránh mount chung gây 401 loop khi vào /dashboard/account)
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/dashboard"
+    )
+      return;
     fetchProducts();
     fetchTransactions();
   }, [fetchProducts, fetchTransactions]);
@@ -69,30 +75,71 @@ export default function DashboardPage() {
     worksheet.mergeCells("A1:G1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = "BÁO CÁO THỐNG KÊ KHO HÀNG ĐỊNH KỲ";
-    titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+    titleCell.font = {
+      name: "Arial",
+      size: 16,
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    };
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
+    titleCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF1E3A8A" },
+    };
     worksheet.getRow(1).height = 40;
 
     worksheet.mergeCells("A2:G2");
     const subTitleCell = worksheet.getCell("A2");
-    subTitleCell.value = `Người lập báo cáo: ${adminName}  |  Ngày xuất bản: ${new Date().toLocaleDateString("vi-VN")}`;
+    subTitleCell.value = `Người lập báo cáo: ${adminName}  |  Ngày xuất bản: ${new Date().toLocaleDateString(
+      "vi-VN"
+    )}`;
     subTitleCell.font = { name: "Arial", size: 11, italic: true };
     subTitleCell.alignment = { vertical: "middle", horizontal: "center" };
     worksheet.getRow(2).height = 25;
 
     worksheet.addRow([]);
-    const headerRow = worksheet.addRow(["STT", "Mã SKU", "Tên Sản Phẩm", "Số Lượng", "Tồn Tối Thiểu", "Vị Trí", "Trạng Thái Tồn Kho"]);
+    const headerRow = worksheet.addRow([
+      "STT",
+      "Mã SKU",
+      "Tên Sản Phẩm",
+      "Số Lượng",
+      "Tồn Tối Thiểu",
+      "Vị Trí",
+      "Trạng Thái Tồn Kho",
+    ]);
     headerRow.height = 25;
     headerRow.eachCell((cell) => {
-      cell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF3B82F6" } };
+      cell.font = {
+        name: "Arial",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+      };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF3B82F6" },
+      };
       cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "medium" }, right: { style: "thin" } };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "medium" },
+        right: { style: "thin" },
+      };
     });
 
     products.forEach((product, index) => {
-      const row = worksheet.addRow([index + 1, product.sku, product.name, Number(product.quantity), Number(product.minQuantity), product.location || "---", product.trangThaiTonKho || "Không xác định"]);
+      const row = worksheet.addRow([
+        index + 1,
+        product.sku,
+        product.name,
+        Number(product.quantity),
+        Number(product.minQuantity),
+        product.location || "---",
+        product.trangThaiTonKho || "Không xác định",
+      ]);
       row.height = 22;
       row.getCell(1).alignment = { horizontal: "center" };
       row.getCell(2).alignment = { horizontal: "center" };
@@ -104,12 +151,25 @@ export default function DashboardPage() {
       row.getCell(7).alignment = { horizontal: "center" };
       row.eachCell((cell) => {
         cell.font = { name: "Arial", size: 10 };
-        cell.border = { top: { style: "thin", color: { argb: "FFE2E8F0" } }, left: { style: "thin", color: { argb: "FFE2E8F0" } }, bottom: { style: "thin", color: { argb: "FFE2E8F0" } }, right: { style: "thin", color: { argb: "FFE2E8F0" } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } },
+        };
       });
     });
 
     worksheet.addRow([]);
-    const totalRow = worksheet.addRow(["TỔNG CỘNG", "", "", "", totalItemsInStock, "", ""]);
+    const totalRow = worksheet.addRow([
+      "TỔNG CỘNG",
+      "",
+      "",
+      "",
+      totalItemsInStock,
+      "",
+      "",
+    ]);
     worksheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
     totalRow.getCell(1).font = { name: "Arial", size: 11, bold: true };
     totalRow.getCell(5).font = { name: "Arial", size: 11, bold: true };
@@ -125,8 +185,13 @@ export default function DashboardPage() {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" });
-    saveAs(blob, `Bao_Cao_Kho_Hang_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+    });
+    saveAs(
+      blob,
+      `Bao_Cao_Kho_Hang_${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
   };
 
   const statCards = [
@@ -155,7 +220,11 @@ export default function DashboardPage() {
       icon: PackageCheck,
       color: "amber",
       iconBg: "linear-gradient(135deg, #d97706, #f59e0b)",
-      change: <><TrendingUp size={12} /> Nhập kho</>,
+      change: (
+        <>
+          <TrendingUp size={12} /> Nhập kho
+        </>
+      ),
     },
     {
       label: "Tổng đã xuất",
@@ -164,7 +233,11 @@ export default function DashboardPage() {
       icon: PackageMinus,
       color: "rose",
       iconBg: "linear-gradient(135deg, #e11d48, #f43f5e)",
-      change: <><TrendingDown size={12} /> Xuất kho</>,
+      change: (
+        <>
+          <TrendingDown size={12} /> Xuất kho
+        </>
+      ),
     },
   ];
 
@@ -522,7 +595,9 @@ export default function DashboardPage() {
                         {act.name}
                       </span>
                       <span
-                        className={`badge ${isImport ? "badge-warning" : "badge-danger"}`}
+                        className={`badge ${
+                          isImport ? "badge-warning" : "badge-danger"
+                        }`}
                       >
                         {isImport ? "Nhập" : "Xuất"}
                       </span>

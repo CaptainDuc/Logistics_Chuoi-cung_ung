@@ -9,6 +9,12 @@ export default function AccountPage() {
   const router = useRouter();
   const { adminName, adminRole, clearStore } = useAdminStore();
 
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("accessToken");
@@ -20,6 +26,8 @@ export default function AccountPage() {
     clearStore();
     router.push("/login");
   };
+
+  if (!mounted) return <div className="min-h-screen bg-[#0a0f1e]" />;
 
   return (
     <div className="page-container" style={{ maxWidth: "600px" }}>

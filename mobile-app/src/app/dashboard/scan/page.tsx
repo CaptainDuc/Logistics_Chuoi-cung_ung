@@ -10,9 +10,11 @@ import { backendFetch } from "@/lib/api";
 export default function ScanPage() {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanData, setScanData] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem("scanData");
     if (saved) setScanData(JSON.parse(saved));
     
@@ -71,6 +73,8 @@ export default function ScanPage() {
 
     verifyProductWithBackend();
   }, [scanResult]);
+
+  if (!mounted) return <div className="min-h-screen bg-[#0a0f1e]" />;
 
   const clearHistory = () => {
     if (window.confirm("Xóa lịch sử quét?")) {

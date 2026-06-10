@@ -49,7 +49,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     loadUserFromStorage();
-  }, [loadUserFromStorage]);
+  }, []); // Run once on mount
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
