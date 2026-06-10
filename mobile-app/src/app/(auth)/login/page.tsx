@@ -18,7 +18,7 @@ const loginSchema = z.object({
   password: z.string().min(6, { message: "Mật khẩu ít nhất 6 ký tự" }),
 });
 
-const API_URL = `${backendBaseUrl}/api`;
+const API_URL = backendBaseUrl.endsWith('/api') ? backendBaseUrl : `${backendBaseUrl}/api`;
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 

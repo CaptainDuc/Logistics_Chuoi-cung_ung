@@ -22,9 +22,14 @@ export const setStoredRefreshToken = (token: string) => {
 };
 
 const normalizeUrl = (path: string) => {
+  // Loại bỏ các trường hợp /api/api
   const base = backendBaseUrl.replace(/\/+$/, '');
-  const uri = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${uri}`;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  
+  if (base.endsWith('/api') && cleanPath.startsWith('/api')) {
+    return `${base}${cleanPath.replace('/api', '')}`;
+  }
+  return `${base}${cleanPath}`;
 };
 
 export const backendFetch = async (
