@@ -1,4 +1,4 @@
-# 📦 Hệ Thống Quản Lý Kho Hàng Nexus (Nexus Warehouse Management)
+# 📦 Hệ Thống Quản Lý Kho Hàng Thông Minh (Smart Warehouse Management System)
 
 Chào mừng bạn đến với dự án Hệ thống Quản lý Kho hàng thông minh. Dự án này bao gồm hai ứng dụng Frontend chuyên biệt nhằm tối ưu hóa quy trình làm việc trong kho hàng hiện đại.
 
@@ -39,11 +39,22 @@ Hệ thống được thiết kế theo phong cách **Glassmorphism Premium**, m
 
 ### Bước 1: Clone dự án
 ```bash
-git clone <url-github-cua-ban>
-cd demo
+git clone (https://github.com/CaptainDuc/Logistics_Chuoi-cung_ung)
+cd <tên thư mục dự án>
 ```
-
-### Bước 2: Cài đặt và Chạy Web App
+### Bước 2: Cấu hình và chạy Backend
+Backend đảm nhận vai trò xử lý logic nghiệp vụ và kết nối Database.
+```bash
+cd backend
+npm install
+Tạo file .env và cấu hình các biến môi trường:
+#PORT=5000
+#MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/nexus_db
+#JWT_SECRET=your_secret_key
+#JWT_REFRESH_SECRET=your_secret_key
+npm start
+```
+### Bước 3: Cài đặt và Chạy Web App
 Cần cài đặt dependencies cho từng ứng dụng:
 ```bash
 cd web-app
@@ -52,49 +63,11 @@ npm run dev
 # Mở trình duyệt tại: http://localhost:3000
 ```
 
-### Bước 3: Cài đặt và Chạy Mobile App
+### Bước 4: Cài đặt và Chạy Mobile App
 ```bash
 cd ../mobile-app
 npm install
 npm run dev
 # Mở trình duyệt tại: http://localhost:3001
 ```
-
 ---
-
-## 📤 Hướng dẫn đẩy Code lên GitHub (Chỉ đẩy Web & Mobile)
-
-Lưu ý: Tôi đã cấu hình file `.gitignore` để tự động loại bỏ thư mục `backend`. Bạn chỉ cần thực hiện các lệnh sau:
-
-1. **Khởi tạo Git (nếu chưa có):**
-   ```bash
-   git init
-   ```
-
-2. **Kiểm tra trạng thái:** (Bạn sẽ thấy `backend/` không xuất hiện trong danh sách)
-   ```bash
-   git status
-   ```
-
-3. **Add và Commit:**
-   ```bash
-   git add .
-   description: "feat: hoàn thiện giao diện Premium cho Web & Mobile"
-   git commit -m "feat: hoàn thiện giao diện Premium cho Web & Mobile"
-   ```
-
-4. **Kết nối repository và Push:**
-   ```bash
-   git remote add origin <url-repository-cua-ban>
-   git branch -M main
-   git push -u origin main
-   ```
-
----
-
-## 📝 Lưu Ý
-- Thư mục `backend` được giữ lại local để bảo mật logic xử lý. 
-- Đảm bảo bạn đã cấu hình biến môi trường `NEXT_PUBLIC_API_URL` trong các file `.env` nếu cần kết nối với Server thực tế.
-
----
-*Dự án được phát triển bởi Antigravity AI.*
