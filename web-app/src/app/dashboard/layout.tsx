@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Warehouse,
+  Users,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -44,6 +45,15 @@ const navItems = [
   },
 ];
 
+const adminNavItems = [
+  {
+    href: "/dashboard/users",
+    label: "Quản lý User",
+    icon: Users,
+    exact: false,
+  },
+];
+
 export default function DashboardLayout({
   children,
 }: {
@@ -54,12 +64,17 @@ export default function DashboardLayout({
   const { isSidebarOpen, toggleSidebar, adminName, adminRole, clearStore } =
     useAdminStore();
   const loadUserFromStorage = useAdminStore(
-    (state) => state.loadUserFromStorage
+    (state) => state.loadUserFromStorage,
   );
 
   useEffect(() => {
     loadUserFromStorage();
   }, []);
+
+  const visibleNavItems = [
+    ...navItems,
+    ...(adminRole === "Admin" ? adminNavItems : []),
+  ];
 
   const handleLogout = async () => {
     const token = localStorage.getItem("token");
@@ -93,13 +108,14 @@ export default function DashboardLayout({
 
   return (
     <div
-      style={{ minHeight: "100vh", background: "var(--bg-base)", display: "flex" }}
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg-base)",
+        display: "flex",
+      }}
     >
       {/* ===== SIDEBAR ===== */}
-      <aside
-        className="sidebar"
-        style={{ width: sidebarW }}
-      >
+      <aside className="sidebar" style={{ width: sidebarW }}>
         {/* Logo */}
         <div
           style={{
@@ -142,7 +158,13 @@ export default function DashboardLayout({
                 >
                   Smart WMS
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: -1 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    marginTop: -1,
+                  }}
+                >
                   Warehouse System
                 </div>
               </div>
@@ -190,7 +212,11 @@ export default function DashboardLayout({
         >
           {!isSidebarOpen && (
             <div style={{ textAlign: "center", marginBottom: 8 }}>
-              <button onClick={toggleSidebar} className="toggle-btn" title="Mở rộng sidebar">
+              <button
+                onClick={toggleSidebar}
+                className="toggle-btn"
+                title="Mở rộng sidebar"
+              >
                 <Menu size={15} />
               </button>
             </div>
@@ -211,7 +237,7 @@ export default function DashboardLayout({
             </div>
           )}
 
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = isActive(item.href, item.exact);
             const Icon = item.icon;
             return (
@@ -411,9 +437,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1 }}>
-          {children}
-        </main>
+        <main style={{ flex: 1 }}>{children}</main>
       </div>
     </div>
   );
