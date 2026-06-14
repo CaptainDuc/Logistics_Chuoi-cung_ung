@@ -25,26 +25,30 @@ const taoTransporter = () => {
 };
 
 /**
- * Gửi email cảnh báo sản phẩm sắp hết hàng tới Admin.
+ * Gửi email cảnh báo sản phẩm sắp hết hàng tới Admin thực hiện.
  * Hàm được gọi tự động sau mỗi lần xuất kho (Export).
  *
  * @param {object} sanPham - Object sản phẩm chứa thông tin cảnh báo
+ * @param {string} emailNguoiNhan - Email của Admin đang đăng nhập hệ thống
  */
-const guiEmailCanhBao = async (sanPham) => {
+const guiEmailCanhBao = async (sanPham, emailNguoiNhan) => {
   try {
     const transporter = taoTransporter();
 
+    // Nếu không lấy được email động của user đăng nhập, hệ thống sẽ tự động fallback về ADMIN_EMAIL trong .env
+    const emailDich = emailNguoiNhan || process.env.ADMIN_EMAIL;
+
     const mailOptions = {
       from: `"Hệ thống Quản lý Kho" <${process.env.EMAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL,
+      to: emailDich,
       subject: `⚠️  CẢNH BÁO: Sản phẩm "${sanPham.name}" sắp hết hàng!`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #e74c3c;">⚠️  Cảnh Báo Sắp Hết Hàng</h2>
-          <p>Hệ thống quản lý kho vừa ghi nhận một sản phẩm có số lượng tồn kho thấp hơn mức cảnh báo.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; margin-top: 0;">⚠️  Cảnh Báo Sắp Hết Hàng</h2>
+          <p>Hệ thống quản lý kho vừa ghi nhận một sản phẩm có số lượng tồn kho thấp hơn mức cảnh báo sau phiên xuất kho của bạn.</p>
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr style="background-color: #f8f9fa;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Tên sản phẩm</td>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;">Tên sản phẩm</td>
               <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.name}</td>
             </tr>
             <tr>
@@ -64,21 +68,21 @@ const guiEmailCanhBao = async (sanPham) => {
               <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.location || "Chưa có thông tin"}</td>
             </tr>
           </table>
-          <p>Vui lòng kiểm tra và tiến hành nhập thêm hàng hóa để tránh tình trạng hết hàng.</p>
+          <p>Vui lòng kiểm tra kế hoạch và tiến hành nhập thêm hàng hóa để tránh tình trạng đứt gãy chuỗi cung ứng.</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #888; font-size: 12px;">Email được gửi tự động từ Hệ thống Quản lý Kho PTIT. Vui lòng không trả lời email này.</p>
+          <p style="color: #888; font-size: 12px; text-align: center;">Email được gửi tự động từ Hệ thống Quản lý Kho PTIT. Vui lòng không trả lời email này.</p>
         </div>
       `,
     };
 
     await transporter.sendMail(mailOptions);
     console.log(
-      `[Email]  Đã gửi email cảnh báo sắp hết hàng cho sản phẩm: "${sanPham.name}" (SKU: ${sanPham.sku})`
+      `[Email]  Đã gửi email cảnh báo sắp hết hàng cho sản phẩm: "${sanPham.name}" (SKU: ${sanPham.sku}) tới địa chỉ: ${emailDich}`,
     );
   } catch (err) {
     console.error(
       `[Email]  Gửi email cảnh báo thất bại cho sản phẩm "${sanPham.name}":`,
-      err.message
+      err.message,
     );
   }
 };
@@ -87,18 +91,12 @@ const guiEmailCanhBao = async (sanPham) => {
  * POST /api/inventory/scan
  * Xử lý dữ liệu quét mã QR (SKU) từ thiết bị.
  * Thực hiện nhập kho (Import) hoặc xuất kho (Export) cho sản phẩm tương ứng.
- *
- * Body: { sku: string, type: 'Import'|'Export', quantity: number }
- *
- * Logic:
- * - Import: Cộng thêm quantity vào tồn kho hiện tại.
- * - Export: Kiểm tra đủ hàng không → trừ quantity → kiểm tra cảnh báo → gửi mail nếu cần.
- * - Luôn ghi nhận 1 bản ghi InventoryLog.
  */
 const quetMaQR = async (req, res) => {
   try {
     const { sku, type, quantity } = req.body;
     const userId = req.user._id;
+    const userEmail = req.user.email; // <--- Lấy email động của Admin đang đăng nhập từ token xác thực
 
     if (!sku || !type || quantity === undefined) {
       return res.status(400).json({
@@ -151,9 +149,10 @@ const quetMaQR = async (req, res) => {
 
       if (soLuongSau <= sanPham.minQuantity) {
         console.log(
-          `[Inventory] ⚠️  Sản phẩm "${sanPham.name}" đã sắp hết hàng. Tiến hành gửi email cảnh báo...`
+          `[Inventory] ⚠️  Sản phẩm "${sanPham.name}" đã sắp hết hàng. Tiến hành gửi email cảnh báo tới Admin ${req.user.username}...`,
         );
-        guiEmailCanhBao(sanPham);
+        // Truyền thêm tham số userEmail vào đây để xử lý gửi động
+        guiEmailCanhBao(sanPham, userEmail);
       }
     }
 
@@ -192,7 +191,6 @@ const quetMaQR = async (req, res) => {
         },
       },
     });
-
   } catch (err) {
     console.error("[Inventory Controller] Lỗi quetMaQR:", err.message);
     return res.status(500).json({
@@ -205,8 +203,6 @@ const quetMaQR = async (req, res) => {
 /**
  * GET /api/inventory/logs
  * Lấy lịch sử nhập/xuất kho (InventoryLog).
- * Hỗ trợ lọc theo: ?productId=, ?userId=, ?type= (Import/Export), giới hạn số bản ghi ?limit=.
- * populate productId và userId để hiển thị thông tin chi tiết thay vì chỉ ObjectId.
  */
 const layLichSuGiaoDich = async (req, res) => {
   try {
@@ -231,7 +227,6 @@ const layLichSuGiaoDich = async (req, res) => {
       data: danhSachLog,
       total: danhSachLog.length,
     });
-
   } catch (err) {
     console.error("[Inventory Controller] Lỗi layLichSuGiaoDich:", err.message);
     return res.status(500).json({
@@ -244,11 +239,6 @@ const layLichSuGiaoDich = async (req, res) => {
 /**
  * GET /api/inventory/export-excel
  * Xuất báo cáo tồn kho hiện tại ra file Excel (.xlsx).
- * Sử dụng thư viện xlsx để tạo workbook và worksheet.
- * Chỉ Admin mới được phép gọi API này.
- *
- * File trả về có các cột: Mã SKU, Tên sản phẩm, Số lượng tồn kho, Hạn mức cảnh báo,
- * Trạng thái tồn kho, Nhà cung cấp, Vị trí lưu trữ, Ngày cập nhật cuối.
  */
 const xuatBaoCaoExcel = async (req, res) => {
   try {
@@ -317,17 +307,16 @@ const xuatBaoCaoExcel = async (req, res) => {
 
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader("Content-Disposition", `attachment; filename="${tenFile}"`);
     res.setHeader("Content-Length", buffer.length);
 
     console.log(
-      `[Inventory]  Đã xuất báo cáo Excel: "${tenFile}" (${danhSachSanPham.length} sản phẩm)`
+      `[Inventory]  Đã xuất báo cáo Excel: "${tenFile}" (${danhSachSanPham.length} sản phẩm)`,
     );
 
     return res.status(200).send(buffer);
-
   } catch (err) {
     console.error("[Inventory Controller] Lỗi xuatBaoCaoExcel:", err.message);
     return res.status(500).json({
