@@ -14,33 +14,31 @@ const userRoutes = require("./src/routes/userRoutes");
 const app = express();
 
 // =========================================================
-// MIDDLEWARE CẤU HÌNH
+// MIDDLEWARE CẤU HÌNH (CORS phải nằm ở ĐẦU TIÊN)
 // =========================================================
 
-// Cho phép CORS từ bất kỳ nguồn nào hoặc danh sách cụ thể
-// Danh sách các nguồn được phép truy cập (Frontend)
 const allowedOrigins = [
   "https://webquanlykhohang.vercel.app",
   "https://webquanlykhohang-4iblszgw7-tranducduc620-5696s-projects.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
-  process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Cho phép các request không có origin (như mobile apps hoặc curl) 
-      // hoặc các origin nằm trong danh sách allowedOrigins
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        callback(new Error("CORS policy: Nguồn này không được phép truy cập."));
+        console.log("CORS blocked origin:", origin);
+        callback(null, false); // Trả về false thay vì lỗi để tránh crash
       }
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   })
 );
 
