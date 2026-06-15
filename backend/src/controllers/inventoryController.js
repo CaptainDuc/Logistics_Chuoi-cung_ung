@@ -7,85 +7,9 @@
  */
 const Product = require("../models/Product");
 const InventoryLog = require("../models/InventoryLog");
-const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
+const { sendInventoryAlert } = require("../utils/mailer");
 
-/**
- * Cấu hình transporter của Nodemailer để gửi email.
- * Thông tin SMTP được lấy từ biến môi trường.
- */
-const taoTransporter = () => {
-  return nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-};
-
-/**
- * Gửi email cảnh báo sản phẩm sắp hết hàng tới Admin thực hiện.
- * Hàm được gọi tự động sau mỗi lần xuất kho (Export).
- *
- * @param {object} sanPham - Object sản phẩm chứa thông tin cảnh báo
- * @param {string} emailNguoiNhan - Email của Admin đang đăng nhập hệ thống
- */
-const guiEmailCanhBao = async (sanPham, emailNguoiNhan) => {
-  try {
-    const transporter = taoTransporter();
-
-    // Nếu không lấy được email động của user đăng nhập, hệ thống sẽ tự động fallback về ADMIN_EMAIL trong .env
-    const emailDich = emailNguoiNhan || process.env.ADMIN_EMAIL;
-
-    const mailOptions = {
-      from: `"Hệ thống Quản lý Kho" <${process.env.EMAIL_USER}>`,
-      to: emailDich,
-      subject: `⚠️  CẢNH BÁO: Sản phẩm "${sanPham.name}" sắp hết hàng!`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
-          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; margin-top: 0;">⚠️  Cảnh Báo Sắp Hết Hàng</h2>
-          <p>Hệ thống quản lý kho vừa ghi nhận một sản phẩm có số lượng tồn kho thấp hơn mức cảnh báo sau phiên xuất kho của bạn.</p>
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-            <tr style="background-color: #f8f9fa;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;">Tên sản phẩm</td>
-              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.name}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Mã SKU</td>
-              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.sku}</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Số lượng hiện tại</td>
-              <td style="padding: 10px; border: 1px solid #ddd; color: #e74c3c; font-weight: bold;">${sanPham.quantity}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Hạn mức cảnh báo</td>
-              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.minQuantity}</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Vị trí lưu trữ</td>
-              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.location || "Chưa có thông tin"}</td>
-            </tr>
-          </table>
-          <p>Vui lòng kiểm tra kế hoạch và tiến hành nhập thêm hàng hóa để tránh tình trạng đứt gãy chuỗi cung ứng.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #888; font-size: 12px; text-align: center;">Email được gửi tự động từ Hệ thống Quản lý Kho PTIT. Vui lòng không trả lời email này.</p>
-        </div>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(
-      `[Email]  Đã gửi email cảnh báo sắp hết hàng cho sản phẩm: "${sanPham.name}" (SKU: ${sanPham.sku}) tới địa chỉ: ${emailDich}`,
-    );
-  } catch (err) {
-    console.error(
-      `[Email]  Gửi email cảnh báo thất bại cho sản phẩm "${sanPham.name}":`,
-      err.message,
-    );
-  }
-};
 
 /**
  * POST /api/inventory/scan
@@ -148,11 +72,14 @@ const quetMaQR = async (req, res) => {
       await sanPham.save();
 
       if (soLuongSau <= sanPham.minQuantity) {
+        const alertType = soLuongSau === 0 ? "OUT_OF_STOCK" : "LOW_STOCK";
         console.log(
-          `[Inventory] ⚠️  Sản phẩm "${sanPham.name}" đã sắp hết hàng. Tiến hành gửi email cảnh báo tới Admin ${req.user.username}...`,
+          `[Inventory] ⚠️  Sản phẩm "${sanPham.name}" ${
+            alertType === "OUT_OF_STOCK" ? "đã hết hàng" : "sắp hết hàng"
+          }. Tiến hành gửi email cảnh báo tới Admin ${userEmail}...`,
         );
-        // Truyền thêm tham số userEmail vào đây để xử lý gửi động
-        guiEmailCanhBao(sanPham, userEmail);
+        // Gửi email động tới Admin đang thao tác
+        sendInventoryAlert(userEmail, sanPham, alertType);
       }
     }
 

@@ -1,5 +1,6 @@
 const Product = require("../models/Product");
 const Supplier = require("../models/Supplier");
+const { sendInventoryAlert } = require("../utils/mailer");
 
 const layTatCaSanPham = async (req, res) => {
   try {
@@ -256,6 +257,19 @@ const capNhatSanPham = async (req, res) => {
     if (location !== undefined) sanPhamHienTai.location = location;
 
     await sanPhamHienTai.save();
+
+    // Tự động kiểm tra và gửi email cảnh báo nếu số lượng thấp hơn ngưỡng
+    if (sanPhamHienTai.quantity <= sanPhamHienTai.minQuantity) {
+      const userEmail = req.user ? req.user.email : process.env.ADMIN_EMAIL;
+      const alertType = sanPhamHienTai.quantity === 0 ? "OUT_OF_STOCK" : "LOW_STOCK";
+      
+      console.log(
+        `[Product Update]  Cảnh báo tồn kho cho "${sanPhamHienTai.name}". Đang gửi email tới: ${userEmail}`
+      );
+      
+      // Không cần await để tránh làm chậm response trả về cho client
+      sendInventoryAlert(userEmail, sanPhamHienTai, alertType);
+    }
 
     const sanPhamCapNhat = await Product.findById(id).populate(
       "supplierId",
