@@ -1,17 +1,6 @@
 const nodemailer = require("nodemailer");
 
 /**
- * Cấu hình transporter của Nodemailer
- */
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-/**
  * Gửi email cảnh báo tồn kho
  * @param {string} toEmail - Email người nhận (Admin đang thao tác)
  * @param {object} product - Thông tin sản phẩm
@@ -19,6 +8,15 @@ const transporter = nodemailer.createTransport({
  */
 const sendInventoryAlert = async (toEmail, product, type = "LOW_STOCK") => {
   try {
+    // Chỉ khởi tạo transporter khi thực sự cần gửi mail
+    const transporter = nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE || "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
     const isOutOfStock = type === "OUT_OF_STOCK" || product.quantity <= 0;
     const recipient = toEmail || process.env.ADMIN_EMAIL;
 
