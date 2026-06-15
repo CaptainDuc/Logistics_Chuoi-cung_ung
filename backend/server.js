@@ -18,9 +18,25 @@ const app = express();
 // =========================================================
 
 // Cho phép CORS từ bất kỳ nguồn nào hoặc danh sách cụ thể
+// Danh sách các nguồn được phép truy cập (Frontend)
+const allowedOrigins = [
+  "https://webquanlykhohang-4iblszgw7-tranducduc620-5696s-projects.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "*", // Bạn có thể thay bằng mảng các domain thật sau khi deploy xong
+    origin: function (origin, callback) {
+      // Cho phép các request không có origin (như mobile apps hoặc curl) 
+      // hoặc các origin nằm trong danh sách allowedOrigins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS policy: Nguồn này không được phép truy cập."));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
