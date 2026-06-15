@@ -1,24 +1,25 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
 
-// Khởi tạo sẵn transporter để tận dụng Connection Pool (giúp gửi mail nhanh hơn rất nhiều)
+// Khởi tạo sẵn transporter để gửi mail nhanh
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // Sử dụng STARTTLS
-  family: 4, // Ép buộc IPv4
+  secure: false, // Dùng STARTTLS
+  // Cách truyền thống: Ép phân giải DNS ra IPv4 để tránh lỗi IPv6 trên Railway
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    // Không quan trọng chứng chỉ có hợp lệ hoàn toàn không (Tránh lỗi trên một số hạ tầng Cloud)
-    rejectUnauthorized: false,
-    minVersion: "TLSv1.2"
+    rejectUnauthorized: false
   },
-  connectionTimeout: 30000, // Tăng lên 30 giây
+  connectionTimeout: 30000,
   greetingTimeout: 30000,
   socketTimeout: 30000,
-  pool: true, // Duy trì kết nối ổn định
 });
 
 /**
