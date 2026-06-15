@@ -5,6 +5,7 @@ const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true, // dùng SSL
+  family: 4, // Ép buộc sử dụng IPv4 để tránh lỗi ENETUNREACH trên Railway
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
