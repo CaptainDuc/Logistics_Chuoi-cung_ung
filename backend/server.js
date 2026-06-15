@@ -13,32 +13,14 @@ const userRoutes = require("./src/routes/userRoutes");
 
 const app = express();
 
-// =========================================================
-// MIDDLEWARE CẤU HÌNH
-// =========================================================
-
-const allowedOrigins = [
-  "https://webquanlykhohang.vercel.app",
-  "https://webquanlykhohang-4iblszgw7-tranducduc620-5696s-projects.vercel.app",
-  "http://localhost:3000",
-  "http://localhost:5173",
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Cho phép nếu không có origin (như Postman) hoặc origin nằm trong danh sách
-    if (!origin || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-      callback(null, true);
-    } else {
-      console.log(`[CORS] Blocked origin: ${origin}`);
-      callback(null, false);
-    }
-  },
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-  optionsSuccessStatus: 204
-}));
+app.use(
+  cors({
+    origin: true, 
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
