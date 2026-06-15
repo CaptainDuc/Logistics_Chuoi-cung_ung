@@ -40,9 +40,6 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-// Xử lý thủ công cho yêu cầu Pre-flight (OPTIONS)
-app.options('*', cors());
-
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
