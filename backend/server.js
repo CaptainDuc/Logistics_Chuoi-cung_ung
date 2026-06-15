@@ -20,6 +20,7 @@ const app = express();
 // Cho phép CORS từ bất kỳ nguồn nào hoặc danh sách cụ thể
 // Danh sách các nguồn được phép truy cập (Frontend)
 const allowedOrigins = [
+  "https://webquanlykhohang.vercel.app",
   "https://webquanlykhohang-4iblszgw7-tranducduc620-5696s-projects.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
