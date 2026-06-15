@@ -14,7 +14,7 @@ const userRoutes = require("./src/routes/userRoutes");
 const app = express();
 
 // =========================================================
-// MIDDLEWARE CẤU HÌNH (CORS phải nằm ở ĐẦU TIÊN)
+// MIDDLEWARE CẤU HÌNH
 // =========================================================
 
 const allowedOrigins = [
@@ -22,25 +22,26 @@ const allowedOrigins = [
   "https://webquanlykhohang-4iblszgw7-tranducduc620-5696s-projects.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
-].filter(Boolean);
+];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.log("CORS blocked origin:", origin);
-        callback(null, false); // Trả về false thay vì lỗi để tránh crash
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  })
-);
+app.use(cors({
+  origin: function (origin, callback) {
+    // Cho phép nếu không có origin (như Postman) hoặc origin nằm trong danh sách
+    if (!origin || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Blocked origin: ${origin}`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  optionsSuccessStatus: 204
+}));
+
+// Xử lý thủ công cho yêu cầu Pre-flight (OPTIONS)
+app.options('*', cors());
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
