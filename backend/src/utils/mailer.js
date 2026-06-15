@@ -1,31 +1,5 @@
 const nodemailer = require("nodemailer");
-const dns = require("dns");
-
-// ÉP TOÀN CỤC: Ưu tiên IPv4 cho mọi kết nối mạng (Cách chính thống nhất)
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first');
-}
-
-// Khởi tạo sẵn transporter để gửi mail nhanh
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // Dùng STARTTLS
-  // Cách truyền thống: Ép phân giải DNS ra IPv4 để tránh lỗi IPv6 trên Railway
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
-  },
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-});
+const dns = require("dns").promises;
 
 /**
  * Gửi email cảnh báo tồn kho
@@ -35,6 +9,24 @@ const transporter = nodemailer.createTransport({
  */
 const sendInventoryAlert = async (toEmail, product, type = "LOW_STOCK") => {
   try {
+    const addresses = await dns.resolve4("smtp.gmail.com");
+    const dynamicHost = addresses[0] || "smtp.gmail.com"; 
+
+    const transporter = nodemailer.createTransport({
+      host: dynamicHost,
+      port: 587,
+      secure: false, 
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false,
+        servername: 'smtp.gmail.com' // Phải có để khớp với chứng chỉ SSL của Google
+      },
+      connectionTimeout: 20000,
+    });
+
     const isOutOfStock = type === "OUT_OF_STOCK" || product.quantity <= 0;
     const recipient = toEmail || process.env.ADMIN_EMAIL;
 
