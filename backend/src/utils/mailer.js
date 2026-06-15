@@ -1,6 +1,11 @@
 const nodemailer = require("nodemailer");
 const dns = require("dns");
 
+// ÉP TOÀN CỤC: Ưu tiên IPv4 cho mọi kết nối mạng (Cách chính thống nhất)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 // Khởi tạo sẵn transporter để gửi mail nhanh
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
