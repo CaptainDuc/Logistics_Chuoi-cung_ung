@@ -1,5 +1,20 @@
 const nodemailer = require("nodemailer");
 
+// Khởi tạo sẵn transporter để tận dụng Connection Pool (giúp gửi mail nhanh hơn rất nhiều)
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // dùng SSL
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  connectionTimeout: 10000, 
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+  pool: true, // Sử dụng pool để duy trì kết nối
+});
+
 /**
  * Gửi email cảnh báo tồn kho
  * @param {string} toEmail - Email người nhận (Admin đang thao tác)
@@ -8,15 +23,6 @@ const nodemailer = require("nodemailer");
  */
 const sendInventoryAlert = async (toEmail, product, type = "LOW_STOCK") => {
   try {
-    // Chỉ khởi tạo transporter khi thực sự cần gửi mail
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
     const isOutOfStock = type === "OUT_OF_STOCK" || product.quantity <= 0;
     const recipient = toEmail || process.env.ADMIN_EMAIL;
 
