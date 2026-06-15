@@ -3,17 +3,22 @@ const nodemailer = require("nodemailer");
 // Khởi tạo sẵn transporter để tận dụng Connection Pool (giúp gửi mail nhanh hơn rất nhiều)
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // dùng SSL
-  family: 4, // Ép buộc sử dụng IPv4 để tránh lỗi ENETUNREACH trên Railway
+  port: 587,
+  secure: false, // Sử dụng STARTTLS
+  family: 4, // Ép buộc IPv4
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 10000, 
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-  pool: true, // Sử dụng pool để duy trì kết nối
+  tls: {
+    // Không quan trọng chứng chỉ có hợp lệ hoàn toàn không (Tránh lỗi trên một số hạ tầng Cloud)
+    rejectUnauthorized: false,
+    minVersion: "TLSv1.2"
+  },
+  connectionTimeout: 30000, // Tăng lên 30 giây
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
+  pool: true, // Duy trì kết nối ổn định
 });
 
 /**
