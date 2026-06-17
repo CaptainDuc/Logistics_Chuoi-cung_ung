@@ -15,6 +15,7 @@ import {
   ArrowDownToLine,
   AlertTriangle,
   CheckCircle,
+  Truck,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
@@ -24,30 +25,131 @@ import { useAdminStore } from "@/store/useAdminStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+interface Supplier {
+  _id: string;
+  name: string;
+}
+
+interface Product {
+  _id: string;
+  sku: string;
+  name: string;
+  location?: string;
+  quantity: number;
+  minQuantity: number;
+}
+
 export default function InboundPage() {
   const { adminName } = useAdminStore();
   const { products, isLoading, fetchProducts, addInventoryTransaction } =
     useWarehouseStore();
 
-  useEffect(() => {
-    if (fetchProducts) fetchProducts();
-  }, []);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Quản lý nhà cung cấp
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isFastSupplierModalOpen, setIsFastSupplierModalOpen] = useState(false);
+  const [fastSupplierName, setFastSupplierName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+
   const [formData, setFormData] = useState({
     productSku: "",
     qty: 1,
+    supplierId: "",
     note: "",
   });
+
   const toast = useToastStore((s) => s.show);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Đồng bộ danh sách ban đầu
+  useEffect(() => {
+    if (fetchProducts) fetchProducts();
+    fetchSuppliers();
+  }, [fetchProducts]);
+
   useEffect(() => {
     setIsAdmin(isAdminUser());
   }, []);
+
+  const fetchSuppliers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/suppliers`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success) {
+          const supplierList = resData.data || [];
+          setSuppliers(supplierList);
+          if (supplierList.length > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              supplierId: supplierList[0]._id,
+            }));
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi lấy danh sách nhà cung cấp:", err);
+    }
+  };
+
+  const handleCreateFastSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fastSupplierName.trim()) {
+      toast("Vui lòng nhập tên nhà cung cấp.", "error");
+      return;
+    }
+    setIsCreatingSupplier(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/suppliers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        // Gửi thêm dữ liệu mới
+        body: JSON.stringify({
+          name: fastSupplierName.trim(),
+          contactName: contactName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+        }),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.message || "Tạo nhà cung cấp nhanh thất bại.");
+      }
+
+      toast("Đã thêm nhanh nhà cung cấp mới!", "success");
+      const newSupplier = resData.data;
+
+      setSuppliers((prev) => [...prev, newSupplier]);
+      setFormData((prev) => ({ ...prev, supplierId: newSupplier._id }));
+
+      // Reset form bao gồm cả 3 trường mới
+      setFastSupplierName("");
+      setContactName("");
+      setEmail("");
+      setPhone("");
+      setIsFastSupplierModalOpen(false);
+    } catch (err: any) {
+      toast(err.message || "Không thể tạo nhanh nhà cung cấp", "error");
+    } finally {
+      setIsCreatingSupplier(false);
+    }
+  };
 
   const handleExportInboundExcel = async () => {
     if (!isAdmin) {
@@ -55,6 +157,7 @@ export default function InboundPage() {
       return;
     }
     setIsExporting(true);
+    let url = "";
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -62,44 +165,45 @@ export default function InboundPage() {
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       if (!response.ok) {
         const msg = await getFetchErrorMessage(
           response,
-          "Không thể xuất Excel nhập kho."
+          "Không thể xuất Excel nhập kho.",
         );
         throw new Error(msg);
       }
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "bao-cao-nhap-kho.xlsx";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
       toast("Đã tải file Excel nhập kho.", "success");
     } catch (err) {
       toast(
         err instanceof Error ? err.message : "Xuất Excel nhập kho thất bại!",
-        "error"
+        "error",
       );
     } finally {
+      if (url) window.URL.revokeObjectURL(url);
       setIsExporting(false);
     }
   };
 
   const handleOpenModal = () => {
-    if (products && products.length > 0) {
-      const firstProduct = products[0];
-      if (firstProduct) {
-        setFormData({ productSku: firstProduct.sku || "", qty: 1, note: "" });
-      }
-    } else {
-      setFormData({ productSku: "", qty: 1, note: "" });
-    }
+    const defaultSupplierId = suppliers.length > 0 ? suppliers[0]._id : "";
+    const safeProducts = products || [];
+
+    setFormData({
+      productSku: safeProducts.length > 0 ? safeProducts[0].sku || "" : "",
+      qty: 1,
+      supplierId: defaultSupplierId,
+      note: "",
+    });
     setIsModalOpen(true);
   };
 
@@ -109,12 +213,20 @@ export default function InboundPage() {
       toast("Vui lòng chọn một sản phẩm để nhập kho.", "error");
       return;
     }
+    if (!formData.supplierId) {
+      toast("Vui lòng lựa chọn hoặc tạo nhanh một nhà cung cấp.", "error");
+      return;
+    }
     setIsSubmitting(true);
+
     const result = await addInventoryTransaction({
       sku: formData.productSku,
       type: "Import",
       quantity: formData.qty,
+      supplierId: formData.supplierId,
+      note: formData.note,
     });
+
     setIsSubmitting(false);
     if (result.ok) {
       toast("Nhập kho thành công.", "success");
@@ -124,12 +236,12 @@ export default function InboundPage() {
     }
   };
 
-  const safeProducts = products || [];
+  const safeProducts: Product[] = products || [];
   const filteredProducts = safeProducts.filter(
     (product) =>
       (product.sku || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.location || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (product.location || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (isLoading) {
@@ -235,7 +347,6 @@ export default function InboundPage() {
           </button>
         </div>
       </div>
-
       {/* ===== SEARCH ===== */}
       <div className="search-bar" style={{ marginBottom: 20, maxWidth: 400 }}>
         <Search size={15} className="search-icon" />
@@ -248,7 +359,6 @@ export default function InboundPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-
       {/* ===== TABLE ===== */}
       <div
         className="animate-fade-up"
@@ -399,8 +509,7 @@ export default function InboundPage() {
           </table>
         </div>
       </div>
-
-      {/* ===== MODAL ===== */}
+      {/* ===== MODAL CHÍNH: LẬP PHIẾU NHẬP KHO ===== */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-panel">
@@ -461,7 +570,7 @@ export default function InboundPage() {
                       value={formData.productSku}
                       onChange={(e) => {
                         const selectedProd = safeProducts.find(
-                          (p) => p.sku === e.target.value
+                          (p) => p.sku === e.target.value,
                         );
                         setFormData({
                           ...formData,
@@ -491,6 +600,50 @@ export default function InboundPage() {
                   )}
                 </div>
 
+                {/* CHỌN NHÀ CUNG CẤP & NÚT THÊM NHANH */}
+                <div>
+                  <label
+                    className="form-label"
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  >
+                    <Truck size={12} />
+                    Đối tác / Nhà cung cấp
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select
+                      className="form-input"
+                      style={{ flex: 1 }}
+                      value={formData.supplierId}
+                      required
+                      onChange={(e) =>
+                        setFormData({ ...formData, supplierId: e.target.value })
+                      }
+                    >
+                      <option value="">-- Chọn nhà cung cấp cấp hàng --</option>
+                      {suppliers.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setIsFastSupplierModalOpen(true)}
+                      style={{
+                        background: "rgba(99,102,241,0.1)",
+                        color: "#6366f1",
+                        border: "1px solid rgba(99,102,241,0.2)",
+                        whiteSpace: "nowrap",
+                        padding: "0 12px",
+                      }}
+                    >
+                      <Plus size={14} />
+                      Thêm nhanh
+                    </button>
+                  </div>
+                </div>
+
                 {/* Quantity */}
                 <div>
                   <label className="form-label">
@@ -506,7 +659,7 @@ export default function InboundPage() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        qty: parseInt(e.target.value) || 1,
+                        qty: parseInt(e.target.value, 10) || 1,
                       })
                     }
                     style={{ fontFamily: "monospace", fontWeight: 600 }}
@@ -579,6 +732,226 @@ export default function InboundPage() {
                     <Check size={14} />
                   )}
                   {isSubmitting ? "Đang xử lý..." : "Xác nhận nhập kho"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL CON: THÊM NHANH NHÀ CUNG CẤP ===== */}
+      {isFastSupplierModalOpen && (
+        <div
+          className="modal-overlay"
+          style={{
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            className="modal-panel"
+            style={{
+              maxWidth: 500,
+              width: "100%",
+              background: "#1e2030",
+              borderRadius: 16,
+              padding: 24,
+              border: "1px solid #334155",
+            }}
+          >
+            <div
+              className="modal-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Truck size={20} color="#818cf8" />
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
+                  Thêm Nhà Cung Cấp
+                </span>
+              </div>
+              <button
+                onClick={() => setIsFastSupplierModalOpen(false)}
+                className="btn-ghost"
+              >
+                <X size={20} color="#94a3b8" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateFastSupplier}>
+              <div
+                className="modal-body"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                  marginBottom: 24,
+                }}
+              >
+                {/* Tên nhà cung cấp */}
+                <div>
+                  <label
+                    className="form-label"
+                    style={{
+                      display: "block",
+                      marginBottom: 8,
+                      color: "#e2e8f0",
+                      fontSize: 14,
+                    }}
+                  >
+                    TÊN NHÀ CUNG CẤP *
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ví dụ: Công ty TNHH A..."
+                    value={fastSupplierName}
+                    onChange={(e) => setFastSupplierName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "1px solid #475569",
+                      padding: "10px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                    }}
+                    required
+                  />
+                </div>
+
+                {/* Người liên hệ */}
+                <div>
+                  <label
+                    className="form-label"
+                    style={{
+                      display: "block",
+                      marginBottom: 8,
+                      color: "#e2e8f0",
+                      fontSize: 14,
+                    }}
+                  >
+                    NGƯỜI LIÊN HỆ
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "1px solid #475569",
+                      padding: "10px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                    }}
+                  />
+                </div>
+
+                {/* Email & Phone (Bố trí nằm ngang nếu màn hình đủ rộng) */}
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      className="form-label"
+                      style={{
+                        display: "block",
+                        marginBottom: 8,
+                        color: "#e2e8f0",
+                        fontSize: 14,
+                      }}
+                    >
+                      EMAIL
+                    </label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      placeholder="email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "1px solid #475569",
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        color: "#fff",
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      className="form-label"
+                      style={{
+                        display: "block",
+                        marginBottom: 8,
+                        color: "#e2e8f0",
+                        fontSize: 14,
+                      }}
+                    >
+                      SỐ ĐIỆN THOẠI
+                    </label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="090..."
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "1px solid #475569",
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        color: "#fff",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="modal-footer"
+                style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}
+              >
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setIsFastSupplierModalOpen(false)}
+                  style={{
+                    padding: "10px 24px",
+                    background: "#334155",
+                    color: "#fff",
+                    borderRadius: 8,
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn"
+                  disabled={isCreatingSupplier}
+                  style={{
+                    padding: "10px 24px",
+                    background: "#6366f1",
+                    color: "#fff",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  {isCreatingSupplier ? (
+                    <Loader2 size={16} className="spinner" />
+                  ) : (
+                    <Check size={16} />
+                  )}
+                  Lưu lại
                 </button>
               </div>
             </form>

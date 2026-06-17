@@ -10,6 +10,8 @@ const authRoutes = require("./src/routes/authRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const inventoryRoutes = require("./src/routes/inventoryRoutes");
 const userRoutes = require("./src/routes/userRoutes");
+const supplierRoutes = require("./src/routes/supplierRoutes");
+const customerRoutes = require("./src/routes/customerRoutes"); // <-- THÊM DÒNG NÀY ĐỂ IMPORT CUSTOMER ROUTE
 
 const app = express();
 
@@ -19,7 +21,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json({ limit: "10mb" }));
@@ -44,13 +46,11 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Server is healthy.",
-      uptime: Math.floor(process.uptime()),
-    });
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy.",
+    uptime: Math.floor(process.uptime()),
+  });
 });
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
@@ -59,18 +59,18 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/customers", customerRoutes); // <-- THÊM DÒNG NÀY ĐỂ KÍCH HOẠT API KHÁCH HÀNG
 
 // =========================================================
 // XỬ LÝ LỖI
 // =========================================================
 
 app.use((req, res) => {
-  res
-    .status(404)
-    .json({
-      success: false,
-      message: `Route không tồn tại: ${req.method} ${req.originalUrl}`,
-    });
+  res.status(404).json({
+    success: false,
+    message: `Route không tồn tại: ${req.method} ${req.originalUrl}`,
+  });
 });
 
 app.use((err, req, res, next) => {

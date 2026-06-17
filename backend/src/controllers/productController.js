@@ -125,22 +125,12 @@ const laySanPhamSapHetHang = async (req, res) => {
 
 const taoSanPhamMoi = async (req, res) => {
   try {
-    const { name, sku, quantity, minQuantity, supplierId, location } = req.body;
+    const { name, sku, minQuantity, supplierId, location } = req.body;
 
     if (!name || !sku) {
       return res.status(400).json({
         success: false,
         message: "Tên sản phẩm (name) và mã SKU là bắt buộc.",
-      });
-    }
-
-    if (
-      quantity !== undefined &&
-      (typeof quantity !== "number" || quantity < 0)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Số lượng (quantity) phải là số không âm.",
       });
     }
 
@@ -172,10 +162,11 @@ const taoSanPhamMoi = async (req, res) => {
       }
     }
 
+    // WMS Rule: Sản phẩm mới tạo mặc định số lượng = 0. Muốn tăng phải quét mã QR Nhập kho.
     const sanPhamMoi = await Product.create({
       name,
       sku: sku.trim().toUpperCase(),
-      quantity: quantity !== undefined ? quantity : 0,
+      quantity: 0,
       minQuantity: minQuantity !== undefined ? minQuantity : 10,
       supplierId: supplierId || null,
       location: location || "",
@@ -183,7 +174,7 @@ const taoSanPhamMoi = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Tạo sản phẩm mới thành công.",
+      message: "Tạo sản phẩm mới thành công với số lượng khởi tạo bằng 0.",
       data: sanPhamMoi,
     });
   } catch (err) {
@@ -211,7 +202,7 @@ const taoSanPhamMoi = async (req, res) => {
 const capNhatSanPham = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, sku, quantity, minQuantity, supplierId, location } = req.body;
+    const { name, sku, minQuantity, supplierId, location } = req.body;
 
     const sanPhamHienTai = await Product.findById(id);
     if (!sanPhamHienTai) {
@@ -252,10 +243,10 @@ const capNhatSanPham = async (req, res) => {
 
     if (name !== undefined) sanPhamHienTai.name = name;
     if (sku !== undefined) sanPhamHienTai.sku = sku.trim().toUpperCase();
-    if (quantity !== undefined) sanPhamHienTai.quantity = quantity;
     if (minQuantity !== undefined) sanPhamHienTai.minQuantity = minQuantity;
     if (location !== undefined) sanPhamHienTai.location = location;
 
+    // KHÔNG cho phép gán đè sanPhamHienTai.quantity ở đây để tránh gian lận / lệch dữ liệu kho.
     await sanPhamHienTai.save();
 
     // Tự động kiểm tra và gửi email cảnh báo nếu số lượng thấp hơn ngưỡng
@@ -278,7 +269,8 @@ const capNhatSanPham = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Cập nhật sản phẩm thành công.",
+      message:
+        "Cập nhật thông tin sản phẩm thành công (Số lượng tồn kho được giữ nguyên).",
       data: sanPhamCapNhat,
     });
   } catch (err) {

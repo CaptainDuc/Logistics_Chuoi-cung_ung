@@ -1,143 +1,227 @@
-/**
- * Controller xử lý các nghiệp vụ liên quan đến Tồn Kho (Inventory).
- * Bao gồm:
- * - Quét mã QR / SKU để nhập kho hoặc xuất kho.
- * - Tự động gửi email cảnh báo khi sản phẩm sắp hết hàng (qua Nodemailer).
- * - Xuất báo cáo tồn kho ra file Excel (qua thư viện xlsx).
- */
 const Product = require("../models/Product");
 const InventoryLog = require("../models/InventoryLog");
+const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
 const { sendInventoryAlert } = require("../utils/mailer");
+
+const taoTransporter = () => {
+  return nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+};
+
+const guiEmailCanhBao = async (sanPham, emailNguoiNhan) => {
+  try {
+    const transporter = taoTransporter();
+    const emailDich = emailNguoiNhan || process.env.ADMIN_EMAIL;
+
+    const mailOptions = {
+      from: `"Hệ thống Quản lý Kho" <${process.env.EMAIL_USER}>`,
+      to: emailDich,
+      subject: `⚠️ CẢNH BÁO: Sản phẩm "${sanPham.name}" sắp hết hàng!`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; margin-top: 0;">⚠️ Cảnh Báo Sắp Hết Hàng</h2>
+          <p>Hệ thống quản lý kho vừa ghi nhận một sản phẩm có số lượng tồn kho thấp hơn mức cảnh báo sau phiên xuất kho của bạn.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr style="background-color: #f8f9fa;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;">Tên sản phẩm</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Mã SKU</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.sku}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Số lượng hiện tại</td>
+              <td style="padding: 10px; border: 1px solid #ddd; color: #e74c3c; font-weight: bold;">${sanPham.quantity}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Hạn mức cảnh báo</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.minQuantity}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Vị trí lưu trữ</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${sanPham.location || "Chưa có thông tin"}</td>
+            </tr>
+          </table>
+          <p>Vui lòng kiểm tra kế hoạch và tiến hành nhập thêm hàng hóa để tránh tình trạng đứt gãy chuỗi cung ứng.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #888; font-size: 12px; text-align: center;">Email được gửi tự động từ Hệ thống Quản lý Kho PTIT. Vui lòng không trả lời email này.</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`[Email] Đã gửi email cảnh báo tới địa chỉ: ${emailDich}`);
+  } catch (err) {
+    console.error(
+      `[Email] Gửi email cảnh báo thất bại cho sản phẩm "${sanPham.name}":`,
+      err.message,
+    );
+  }
+};
 
 
 /**
  * POST /api/inventory/scan
- * Xử lý dữ liệu quét mã QR (SKU) từ thiết bị.
- * Thực hiện nhập kho (Import) hoặc xuất kho (Export) cho sản phẩm tương ứng.
+ * Xử lý quét QR / lập phiếu nhập xuất với cơ chế ACID Transaction và Atomic Update
  */
 const quetMaQR = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { sku, type, quantity } = req.body;
+    // Nhận thêm customerName (nhập liệu tự do) và customerId (chọn từ danh sách Khách hàng) từ body gửi lên
+    const { sku, type, quantity, customerName, customerId } = req.body;
     const userId = req.user._id;
-    const userEmail = req.user.email; // <--- Lấy email động của Admin đang đăng nhập từ token xác thực
+    const userEmail = req.user.email;
 
     if (!sku || !type || quantity === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Các trường "sku", "type" và "quantity" là bắt buộc.',
-      });
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Các trường "sku", "type" và "quantity" là bắt buộc.',
+        });
     }
 
     if (!["Import", "Export"].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Trường "type" phải là "Import" (nhập kho) hoặc "Export" (xuất kho).',
-      });
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Trường "type" phải là "Import" hoặc "Export".',
+        });
     }
 
     if (typeof quantity !== "number" || quantity <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Trường "quantity" phải là số nguyên dương lớn hơn 0.',
+        });
+    }
+
+    const dinhDangSku = sku.trim().toUpperCase();
+
+    // Bước 1: Kiểm tra xem sản phẩm có tồn tại hay không
+    const sanPhamGoc = await Product.findOne({ sku: dinhDangSku }).session(
+      session,
+    );
+    if (!sanPhamGoc) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: `Không tìm thấy sản phẩm với mã SKU "${sku}".`,
+        });
+    }
+
+    const soLuongTruoc = sanPhamGoc.quantity;
+    let dieuKienUpdate = { sku: dinhDangSku };
+    let giaTriThayDoi = type === "Import" ? quantity : -quantity;
+
+    // Nếu xuất kho, bắt buộc hàng tồn kho hiện tại phải đủ lớn hơn số lượng xuất (Atomic Check)
+    if (type === "Export") {
+      dieuKienUpdate.quantity = { $gte: quantity };
+    }
+
+    // Bước 2: Cập nhật trực tiếp số lượng tồn kho dưới DB chống Race Condition
+    const sanPhamCapNhat = await Product.findOneAndUpdate(
+      dieuKienUpdate,
+      { $inc: { quantity: giaTriThayDoi } },
+      { new: true, session: session },
+    );
+
+    if (!sanPhamCapNhat) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
-        message: 'Trường "quantity" phải là số nguyên dương lớn hơn 0.',
+        message: `Số lượng xuất (${quantity}) vượt quá số lượng tồn thực tế trong kho (${soLuongTruoc}). Giao dịch thất bại.`,
       });
     }
 
-    const sanPham = await Product.findOne({ sku: sku.trim().toUpperCase() });
-    if (!sanPham) {
-      return res.status(404).json({
-        success: false,
-        message: `Không tìm thấy sản phẩm với mã SKU "${sku}". Vui lòng kiểm tra lại mã vạch.`,
-      });
+    // Bước 3: Ghi nhận lịch sử giao dịch tương ứng (Ghi cả ID đối tác và Tên text tự do nếu có)
+    const logGiaoDich = await InventoryLog.create(
+      [
+        {
+          productId: sanPhamCapNhat._id,
+          userId: userId,
+          type: type,
+          quantity: quantity,
+          customerName: customerName || "",
+          customerId: customerId || null, // Lưu ID khách hàng phục vụ thống kê nâng cao
+        },
+      ],
+      { session: session },
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Kích hoạt email cảnh báo không đồng bộ bên ngoài Transaction để tối ưu thời gian phản hồi API
+    if (
+      type === "Export" &&
+      sanPhamCapNhat.quantity <= sanPhamCapNhat.minQuantity
+    ) {
+      guiEmailCanhBao(sanPhamCapNhat, userEmail);
     }
-
-    let soLuongTruoc = sanPham.quantity;
-    let soLuongSau = soLuongTruoc;
-
-    if (type === "Import") {
-      soLuongSau = soLuongTruoc + quantity;
-      sanPham.quantity = soLuongSau;
-      await sanPham.save();
-    } else if (type === "Export") {
-      if (soLuongTruoc < quantity) {
-        return res.status(400).json({
-          success: false,
-          message: `Số lượng xuất (${quantity}) vượt quá số lượng tồn kho hiện tại (${soLuongTruoc}). Không thể xuất kho.`,
-        });
-      }
-
-      soLuongSau = soLuongTruoc - quantity;
-      sanPham.quantity = soLuongSau;
-      await sanPham.save();
-
-      if (soLuongSau <= sanPham.minQuantity) {
-        const alertType = soLuongSau === 0 ? "OUT_OF_STOCK" : "LOW_STOCK";
-        console.log(
-          `[Inventory] ⚠️  Sản phẩm "${sanPham.name}" ${
-            alertType === "OUT_OF_STOCK" ? "đã hết hàng" : "sắp hết hàng"
-          }. Tiến hành gửi email cảnh báo tới Admin ${userEmail}...`,
-        );
-        // Gửi email động tới Admin đang thao tác
-        sendInventoryAlert(userEmail, sanPham, alertType);
-      }
-    }
-
-    const logGiaoDich = await InventoryLog.create({
-      productId: sanPham._id,
-      userId: userId,
-      type: type,
-      quantity: quantity,
-    });
-
     return res.status(200).json({
       success: true,
-      message: `Giao dịch ${
-        type === "Import" ? "nhập kho" : "xuất kho"
-      } thành công.`,
+      message: `Giao dịch ${type === "Import" ? "nhập kho" : "xuất kho"} thành công.`,
       data: {
         sanPham: {
-          _id: sanPham._id,
-          name: sanPham.name,
-          sku: sanPham.sku,
+          _id: sanPhamCapNhat._id,
+          name: sanPhamCapNhat.name,
+          sku: sanPhamCapNhat.sku,
           soLuongTruoc: soLuongTruoc,
           soLuongThayDoi: type === "Import" ? `+${quantity}` : `-${quantity}`,
-          soLuongSau: soLuongSau,
-          location: sanPham.location,
+          soLuongSau: sanPhamCapNhat.quantity,
         },
         logGiaoDich: {
-          _id: logGiaoDich._id,
-          type: logGiaoDich.type,
-          quantity: logGiaoDich.quantity,
-          createdAt: logGiaoDich.createdAt,
-        },
-        nguoiThucHien: {
-          _id: req.user._id,
-          username: req.user.username,
-          role: req.user.role,
+          _id: logGiaoDich[0]._id,
+          type: logGiaoDich[0].type,
+          quantity: logGiaoDich[0].quantity,
+          customerName: logGiaoDich[0].customerName,
+          customerId: logGiaoDich[0].customerId,
+          createdAt: logGiaoDich[0].createdAt,
         },
       },
     });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("[Inventory Controller] Lỗi quetMaQR:", err.message);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi server khi xử lý quét mã QR.",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Lỗi server khi xử lý giao dịch kho." });
   }
 };
 
-/**
- * GET /api/inventory/logs
- * Lấy lịch sử nhập/xuất kho (InventoryLog).
- */
 const layLichSuGiaoDich = async (req, res) => {
   try {
-    const { productId, userId, type, limit } = req.query;
+    const { productId, userId, customerId, type, limit } = req.query;
     const filter = {};
 
     if (productId) filter.productId = productId;
     if (userId) filter.userId = userId;
+    if (customerId) filter.customerId = customerId; // Hỗ trợ lọc lịch sử xuất hàng theo từng Đại lý
     if (type && ["Import", "Export"].includes(type)) filter.type = type;
 
     const soLuongGiớiHan = parseInt(limit) > 0 ? parseInt(limit) : 100;
@@ -145,6 +229,7 @@ const layLichSuGiaoDich = async (req, res) => {
     const danhSachLog = await InventoryLog.find(filter)
       .populate("productId", "name sku location")
       .populate("userId", "username role")
+      .populate("customerId", "name contactName phone") // Populate đầy đủ thông tin Khách hàng để hiển thị lên bảng
       .sort({ createdAt: -1 })
       .limit(soLuongGiớiHan);
 
@@ -156,17 +241,15 @@ const layLichSuGiaoDich = async (req, res) => {
     });
   } catch (err) {
     console.error("[Inventory Controller] Lỗi layLichSuGiaoDich:", err.message);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi server khi lấy lịch sử giao dịch.",
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Lỗi server khi lấy lịch sử giao dịch.",
+      });
   }
 };
 
-/**
- * GET /api/inventory/export-excel
- * Xuất báo cáo tồn kho hiện tại ra file Excel (.xlsx).
- */
 const xuatBaoCaoExcel = async (req, res) => {
   try {
     const danhSachSanPham = await Product.find({})
@@ -174,10 +257,12 @@ const xuatBaoCaoExcel = async (req, res) => {
       .sort({ createdAt: -1 });
 
     if (danhSachSanPham.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Không có dữ liệu sản phẩm để xuất báo cáo.",
-      });
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Không có dữ liệu sản phẩm để xuất báo cáo.",
+        });
     }
 
     const duLieuExcel = danhSachSanPham.map((sp, index) => {
@@ -207,7 +292,6 @@ const xuatBaoCaoExcel = async (req, res) => {
     });
 
     const worksheet = XLSX.utils.json_to_sheet(duLieuExcel);
-
     worksheet["!cols"] = [
       { wch: 5 },
       { wch: 20 },
@@ -226,11 +310,11 @@ const xuatBaoCaoExcel = async (req, res) => {
 
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
-    const thoiGian = new Date()
+    const gioVietNam = new Date(new Date().getTime() + 7 * 60 * 60 * 1000)
       .toISOString()
       .replace(/[:.]/g, "-")
       .slice(0, 19);
-    const tenFile = `BaoCaoTonKho_${thoiGian}.xlsx`;
+    const tenFile = `BaoCaoTonKho_${gioVietNam}.xlsx`;
 
     res.setHeader(
       "Content-Type",
@@ -239,17 +323,12 @@ const xuatBaoCaoExcel = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${tenFile}"`);
     res.setHeader("Content-Length", buffer.length);
 
-    console.log(
-      `[Inventory]  Đã xuất báo cáo Excel: "${tenFile}" (${danhSachSanPham.length} sản phẩm)`,
-    );
-
     return res.status(200).send(buffer);
   } catch (err) {
     console.error("[Inventory Controller] Lỗi xuatBaoCaoExcel:", err.message);
-    return res.status(500).json({
-      success: false,
-      message: "Lỗi server khi xuất báo cáo Excel.",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Lỗi server khi xuất báo cáo Excel." });
   }
 };
 

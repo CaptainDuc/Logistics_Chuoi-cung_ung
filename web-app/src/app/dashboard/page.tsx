@@ -1,12 +1,12 @@
 // src/app/dashboard/page.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useAdminStore } from "@/store/useAdminStore";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import Link from "next/link"; // Import Link để chuyển route
+import Link from "next/link";
 import {
   Package,
   PackageCheck,
@@ -19,6 +19,11 @@ import {
   ArrowDownRight,
   Clock,
   Sparkles,
+  X,
+  User,
+  MapPin,
+  QrCode,
+  FileText,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -31,10 +36,14 @@ export default function DashboardPage() {
   } = useWarehouseStore();
   const { adminName } = useAdminStore();
 
+  // State quản lý đóng/mở và lưu trữ thông tin log đang chọn xem chi tiết
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+
+  // SỬA TẠI ĐÂY: Thay đổi mảng phụ thuộc thành [] để chặn vòng lặp vô hạn gây log liên tục
   useEffect(() => {
     fetchProducts();
     fetchTransactions();
-  }, [fetchProducts, fetchTransactions]);
+  }, []);
 
   const totalProductTypes = products.length;
   const totalItemsInStock = products.reduce(
@@ -242,7 +251,7 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ position: "relative" }}>
       {/* ===== PAGE HEADER ===== */}
       <div
         style={{
@@ -312,8 +321,7 @@ export default function DashboardPage() {
           onClick={handleExportExcel}
           disabled={isLoading || products.length === 0}
         >
-          <FileBarChart2 size={15} />
-          Xuất Báo Cáo Excel
+          <FileBarChart2 size={15} /> Xuất Báo Cáo Excel
         </button>
       </div>
 
@@ -357,7 +365,6 @@ export default function DashboardPage() {
                 >
                   <Icon size={20} color="#fff" />
                 </div>
-
                 {card.change && (
                   <div
                     style={{
@@ -392,11 +399,7 @@ export default function DashboardPage() {
                   {card.label}
                 </div>
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 6,
-                  }}
+                  style={{ display: "flex", alignItems: "baseline", gap: 6 }}
                 >
                   <span
                     style={{
@@ -421,7 +424,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Tích hợp Link chuyển tiếp route tại đây */}
               {card.color === "emerald" && lowStockCount > 0 && (
                 <Link
                   href="/dashboard/products/low-stock"
@@ -554,7 +556,21 @@ export default function DashboardPage() {
                 <div
                   key={act._id}
                   className="activity-item animate-fade-up"
-                  style={{ animationDelay: `${idx * 30}ms` }}
+                  style={{
+                    animationDelay: `${idx * 30}ms`,
+                    cursor: "pointer",
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                  onClick={() => setSelectedTx(act)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background =
+                      "rgba(255, 255, 255, 0.02)";
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.transform = "translateX(0px)";
+                  }}
                 >
                   {/* Type icon */}
                   <div
@@ -642,7 +658,7 @@ export default function DashboardPage() {
                         marginTop: 2,
                       }}
                     >
-                      {act.date}
+                      {act.date.split(" ")[1] || act.date}
                     </div>
                   </div>
                 </div>
@@ -651,6 +667,335 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ===== POP-UP MODAL XEM CHI TIẾT ===== */}
+      {selectedTx && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setSelectedTx(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "#11131e",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 500,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              overflow: "hidden",
+              animation: "scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background:
+                  selectedTx.type === "Import"
+                    ? "linear-gradient(to right, rgba(245,158,11,0.05), transparent)"
+                    : "linear-gradient(to right, rgba(244,63,94,0.05), transparent)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flex: 1,
+                }}
+              >
+                <FileText
+                  size={18}
+                  color={selectedTx.type === "Import" ? "#f59e0b" : "#f43f5e"}
+                />
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#fff",
+                    margin: 0,
+                  }}
+                >
+                  Chi Tiết Phiếu{" "}
+                  {selectedTx.type === "Import" ? "Nhập Kho" : "Xuất Kho"}
+                </h3>
+              </div>
+              <button
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#9ca3af",
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+                onClick={() => setSelectedTx(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div
+              style={{
+                padding: "24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+              }}
+            >
+              <div
+                style={{
+                  textAlign: "center",
+                  paddingBottom: 14,
+                  borderBottom: "1px dashed rgba(255,255,255,0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#fff",
+                    marginBottom: 6,
+                  }}
+                >
+                  {selectedTx.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 800,
+                    color: selectedTx.type === "Import" ? "#f59e0b" : "#f43f5e",
+                  }}
+                >
+                  {selectedTx.type === "Import" ? "+" : "-"}{" "}
+                  {selectedTx.quantity}{" "}
+                  <span
+                    style={{ fontSize: 14, fontWeight: 400, color: "#9ca3af" }}
+                  >
+                    sản phẩm
+                  </span>
+                </div>
+              </div>
+
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                    Mã chứng từ:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#e5e7eb",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {selectedTx._id}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <QrCode size={14} /> Mã SKU:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#818cf8",
+                      background: "rgba(99,102,241,0.1)",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                    }}
+                  >
+                    {selectedTx.sku}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <MapPin size={14} /> Vị trí lưu kho:
+                  </span>
+                  <span
+                    style={{ fontSize: 13, fontWeight: 600, color: "#e5e7eb" }}
+                  >
+                    {selectedTx.location}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Clock size={14} /> Thời gian thực hiện:
+                  </span>
+                  <span style={{ fontSize: 13, color: "#e5e7eb" }}>
+                    {selectedTx.date}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 6,
+                    paddingTop: 12,
+                    borderTop: "1px dashed rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <User size={14} /> Người xử lý:
+                  </span>
+                  <div style={{ textAlign: "right" }}>
+                    <div
+                      style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}
+                    >
+                      {selectedTx.executor?.username || "Ẩn danh"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#818cf8",
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {selectedTx.executor?.role || "User"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+                display: "flex",
+                justifyContent: "flex-end",
+                backgroundColor: "rgba(0,0,0,0.15)",
+              }}
+            >
+              <button
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onClick={() => setSelectedTx(null)}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "rgba(255,255,255,0.08)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "rgba(255,255,255,0.03)")
+                }
+              >
+                Đóng lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Thẻ CSS an toàn không lỗi render */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes fadeIn {
+          from { opacity: 0; } to { opacity: 1; }
+        }
+        @keyframes scaleUp {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+      `,
+        }}
+      />
     </div>
   );
 }

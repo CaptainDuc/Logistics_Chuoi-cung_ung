@@ -2,6 +2,7 @@ import { create } from "zustand";
 import axios from "axios";
 import { backendBaseUrl } from "@/lib/api";
 
+// Định nghĩa đầy đủ kiểu dữ liệu cấu trúc Sản phẩm
 interface Product {
   _id: string;
   sku: string;
@@ -15,12 +16,19 @@ interface Product {
   trangThaiTonKho?: string;
 }
 
+// Định nghĩa chi tiết cấu trúc Giao dịch phục vụ xem Pop-up
 interface Transaction {
   _id: string;
   name: string;
+  sku: string;
+  location: string;
   type: "Import" | "Export";
   quantity: number;
   date: string;
+  executor: {
+    username: string;
+    role: string;
+  };
 }
 
 interface WarehouseState {
@@ -33,9 +41,13 @@ interface WarehouseState {
     sku: string;
     type: "Import" | "Export";
     quantity: number;
+    customerName?: string;
+    customerId?: string;
+    supplierId?: string; 
+    note?: string; 
   }) => Promise<{ ok: boolean; message: string }>;
   addProduct: (
-    product: Omit<Product, "_id" | "trangThaiTonKho">
+    product: Omit<Product, "_id" | "trangThaiTonKho">,
   ) => Promise<{ ok: boolean; message: string }>;
   deleteProduct: (id: string) => Promise<{ ok: boolean; message: string }>;
 }
@@ -52,14 +64,13 @@ const getAuthHeader = () => {
   return { Authorization: `Bearer ${token}` };
 };
 
+let isRedirecting = false;
+
 const clearAuthAndRedirect = () => {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("token");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("user");
-  localStorage.removeItem("userRole");
-  localStorage.removeItem("userName");
+  if (typeof window === "undefined" || isRedirecting) return;
+
+  isRedirecting = true;
+  localStorage.clear();
   document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   window.location.href = "/login";
 };
@@ -69,12 +80,20 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   transactions: [],
   isLoading: false,
 
-  addInventoryTransaction: async ({ sku, type, quantity }) => {
+  // ĐÃ UPDATE NHẬN ĐẦY ĐỦ THAM SỐ VÀ GỬI LÊN SERVER
+  addInventoryTransaction: async ({
+    sku,
+    type,
+    quantity,
+    customerName,
+    supplierId,
+    note,
+  }) => {
     try {
       const response = await axios.post(
         `${API_URL}/inventory/scan`,
-        { sku, type, quantity },
-        { headers: getAuthHeader() }
+        { sku, type, quantity, customerName, supplierId, note }, // Gửi kèm lên API backend
+        { headers: getAuthHeader() },
       );
 
       if (response.data?.success) {
@@ -85,16 +104,15 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
           message: response.data?.message || "Giao dịch thành công",
         };
       }
-
       return {
         ok: false,
         message: response.data?.message || "Lỗi không xác định",
       };
     } catch (error: any) {
-      if (error.response?.data?.message) {
-        return { ok: false, message: error.response.data.message };
-      }
-      return { ok: false, message: "Lỗi kết nối Server" };
+      return {
+        ok: false,
+        message: error.response?.data?.message || "Lỗi kết nối Server",
+      };
     }
   },
 
@@ -108,10 +126,7 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
         set({ products: response.data.data });
       }
     } catch (error: any) {
-      console.error("Fetch products error:", error);
-      if (error.response?.status === 401) {
-        clearAuthAndRedirect();
-      }
+      if (error.response?.status === 401) clearAuthAndRedirect();
     } finally {
       set({ isLoading: false });
     }
@@ -126,17 +141,20 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
         const mapped = (response.data.data || []).map((t: any) => ({
           _id: t._id,
           name: t.productId?.name || "Sản phẩm đã xóa",
+          sku: t.productId?.sku || "N/A",
+          location: t.productId?.location || "Chưa định vị",
           type: t.type,
           quantity: t.quantity || 0,
-          date: new Date(t.createdAt).toLocaleDateString("vi-VN"),
+          date: new Date(t.createdAt).toLocaleString("vi-VN"),
+          executor: {
+            username: t.userId?.username || "Ẩn danh",
+            role: t.userId?.role || "User",
+          },
         }));
         set({ transactions: mapped });
       }
     } catch (error: any) {
-      console.error("Fetch transactions error:", error);
-      if (error.response?.status === 401) {
-        clearAuthAndRedirect();
-      }
+      if (error.response?.status === 401) clearAuthAndRedirect();
     }
   },
 
