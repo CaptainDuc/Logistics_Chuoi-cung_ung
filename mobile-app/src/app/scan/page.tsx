@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import QRScanner from "./QRScanner";
 import { exportToExcel } from "@/utils/exportExcel";
@@ -34,8 +34,9 @@ export default function ScanPage() {
 
     const verifyProductWithBackend = async () => {
       try {
-        // Gọi API đến Backend để kiểm tra mã SKU vừa quét được
-        const response = await fetch(`http://localhost:4000/api/products/${scanResult}`);
+        // 🌟 Lấy địa chỉ Backend từ biến môi trường, mặc định là localhost nếu chưa cấu hình
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+        const response = await fetch(`${backendUrl}/api/products/${scanResult}`);
         
         if (!response.ok) {
           throw new Error("Không tìm thấy sản phẩm trong hệ thống");
