@@ -67,7 +67,6 @@ const guiEmailCanhBao = async (sanPham, emailNguoiNhan) => {
   }
 };
 
-
 /**
  * POST /api/inventory/scan
  * Xử lý quét QR / lập phiếu nhập xuất với cơ chế ACID Transaction và Atomic Update
@@ -85,34 +84,28 @@ const quetMaQR = async (req, res) => {
     if (!sku || !type || quantity === undefined) {
       await session.abortTransaction();
       session.endSession();
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Các trường "sku", "type" và "quantity" là bắt buộc.',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Các trường "sku", "type" và "quantity" là bắt buộc.',
+      });
     }
 
     if (!["Import", "Export"].includes(type)) {
       await session.abortTransaction();
       session.endSession();
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Trường "type" phải là "Import" hoặc "Export".',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Trường "type" phải là "Import" hoặc "Export".',
+      });
     }
 
     if (typeof quantity !== "number" || quantity <= 0) {
       await session.abortTransaction();
       session.endSession();
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Trường "quantity" phải là số nguyên dương lớn hơn 0.',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Trường "quantity" phải là số nguyên dương lớn hơn 0.',
+      });
     }
 
     const dinhDangSku = sku.trim().toUpperCase();
@@ -124,12 +117,10 @@ const quetMaQR = async (req, res) => {
     if (!sanPhamGoc) {
       await session.abortTransaction();
       session.endSession();
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: `Không tìm thấy sản phẩm với mã SKU "${sku}".`,
-        });
+      return res.status(404).json({
+        success: false,
+        message: `Không tìm thấy sản phẩm với mã SKU "${sku}".`,
+      });
     }
 
     const soLuongTruoc = sanPhamGoc.quantity;
@@ -146,7 +137,7 @@ const quetMaQR = async (req, res) => {
       dieuKienUpdate,
       { $inc: { quantity: giaTriThayDoi } },
       { new: true, session: session },
-    );
+    ).populate("supplierId", "name");
 
     if (!sanPhamCapNhat) {
       await session.abortTransaction();
@@ -221,32 +212,39 @@ const layLichSuGiaoDich = async (req, res) => {
 
     if (productId) filter.productId = productId;
     if (userId) filter.userId = userId;
-    if (customerId) filter.customerId = customerId; // Hỗ trợ lọc lịch sử xuất hàng theo từng Đại lý
+    if (customerId) filter.customerId = customerId;
     if (type && ["Import", "Export"].includes(type)) filter.type = type;
 
     const soLuongGiớiHan = parseInt(limit) > 0 ? parseInt(limit) : 100;
 
+    // TỐI ƯU: Chỉ sử dụng 1 lệnh populate lồng nhau duy nhất cho productId
+    // Thay toàn bộ phần populate cũ bằng cấu trúc này:
     const danhSachLog = await InventoryLog.find(filter)
-      .populate("productId", "name sku location")
+      .populate({
+        path: "productId",
+        select: "name sku location supplierId",
+        populate: {
+          path: "supplierId",
+          model: "Supplier", // Đảm bảo tên Model Supplier khớp với khai báo trong backend
+          select: "name", // Chỉ lấy trường tên nhà cung cấp
+        },
+      })
       .populate("userId", "username role")
-      .populate("customerId", "name contactName phone") // Populate đầy đủ thông tin Khách hàng để hiển thị lên bảng
+      .populate("customerId", "name contactName phone")
       .sort({ createdAt: -1 })
       .limit(soLuongGiớiHan);
 
     return res.status(200).json({
       success: true,
-      message: `Lấy lịch sử giao dịch thành công. Tìm thấy ${danhSachLog.length} bản ghi.`,
+      message: `Lấy lịch sử giao dịch thành công.`,
       data: danhSachLog,
-      total: danhSachLog.length,
     });
   } catch (err) {
     console.error("[Inventory Controller] Lỗi layLichSuGiaoDich:", err.message);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Lỗi server khi lấy lịch sử giao dịch.",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy lịch sử giao dịch.",
+    });
   }
 };
 
@@ -257,12 +255,10 @@ const xuatBaoCaoExcel = async (req, res) => {
       .sort({ createdAt: -1 });
 
     if (danhSachSanPham.length === 0) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Không có dữ liệu sản phẩm để xuất báo cáo.",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Không có dữ liệu sản phẩm để xuất báo cáo.",
+      });
     }
 
     const duLieuExcel = danhSachSanPham.map((sp, index) => {

@@ -7,6 +7,7 @@ import { useAdminStore } from "@/store/useAdminStore";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import Link from "next/link";
+
 import {
   Package,
   PackageCheck,
@@ -24,6 +25,7 @@ import {
   MapPin,
   QrCode,
   FileText,
+  Building2,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -901,6 +903,31 @@ export default function DashboardPage() {
                   </span>
                 </div>
 
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Building2 size={14} /> Nhà cung cấp:
+                  </span>
+                  <span
+                    style={{ fontSize: 13, fontWeight: 600, color: "#e5e7eb" }}
+                  >
+                    {/* Truy cập qua đường dẫn đã populate */}
+                    {selectedTx.supplierName}
+                  </span>
+                </div>
                 <div
                   style={{
                     display: "flex",

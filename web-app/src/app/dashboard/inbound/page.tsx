@@ -16,6 +16,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Truck,
+  Clock,
+  ArrowDownRight,
+  User,
+  QrCode,
+  Building2,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
@@ -39,6 +44,17 @@ interface Product {
   minQuantity: number;
 }
 
+interface InboundLog {
+  _id: string;
+  quantity: number;
+  createdAt: string;
+  supplierName: string;
+  executor: {
+    username: string;
+    role: string;
+  };
+}
+
 export default function InboundPage() {
   const { adminName } = useAdminStore();
   const { products, isLoading, fetchProducts, addInventoryTransaction } =
@@ -46,6 +62,12 @@ export default function InboundPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // State lịch sử nhập kho của sản phẩm
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState<InboundLog[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Quản lý nhà cung cấp
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -68,7 +90,6 @@ export default function InboundPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Đồng bộ danh sách ban đầu
   useEffect(() => {
     if (fetchProducts) fetchProducts();
     fetchSuppliers();
@@ -103,6 +124,39 @@ export default function InboundPage() {
     }
   };
 
+  // Fetch lịch sử nhập kho theo productId
+  const handleOpenHistory = async (product: Product) => {
+    setSelectedProduct(product);
+    setIsHistoryModalOpen(true);
+    setIsLoadingHistory(true);
+    setHistoryLogs([]);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/inventory/logs?productId=${product._id}&type=Import`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const resData = await response.json();
+      if (resData.success) {
+        const mapped = (resData.data || []).map((t: any) => ({
+          _id: t._id,
+          quantity: t.quantity,
+          createdAt: t.createdAt,
+          supplierName: t.productId?.supplierId?.name || "Không xác định",
+          executor: {
+            username: t.userId?.username || "Ẩn danh",
+            role: t.userId?.role || "User",
+          },
+        }));
+        setHistoryLogs(mapped);
+      }
+    } catch (err) {
+      toast("Không thể tải lịch sử giao dịch.", "error");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   const handleCreateFastSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fastSupplierName.trim()) {
@@ -118,7 +172,6 @@ export default function InboundPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        // Gửi thêm dữ liệu mới
         body: JSON.stringify({
           name: fastSupplierName.trim(),
           contactName: contactName.trim(),
@@ -126,19 +179,13 @@ export default function InboundPage() {
           phone: phone.trim(),
         }),
       });
-
       const resData = await response.json();
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(resData.message || "Tạo nhà cung cấp nhanh thất bại.");
-      }
-
       toast("Đã thêm nhanh nhà cung cấp mới!", "success");
       const newSupplier = resData.data;
-
       setSuppliers((prev) => [...prev, newSupplier]);
       setFormData((prev) => ({ ...prev, supplierId: newSupplier._id }));
-
-      // Reset form bao gồm cả 3 trường mới
       setFastSupplierName("");
       setContactName("");
       setEmail("");
@@ -194,12 +241,12 @@ export default function InboundPage() {
     }
   };
 
-  const handleOpenModal = () => {
+  const handleOpenModal = (sku?: string) => {
     const defaultSupplierId = suppliers.length > 0 ? suppliers[0]._id : "";
     const safeProducts = products || [];
-
     setFormData({
-      productSku: safeProducts.length > 0 ? safeProducts[0].sku || "" : "",
+      productSku:
+        sku || (safeProducts.length > 0 ? safeProducts[0].sku || "" : ""),
       qty: 1,
       supplierId: defaultSupplierId,
       note: "",
@@ -218,7 +265,6 @@ export default function InboundPage() {
       return;
     }
     setIsSubmitting(true);
-
     const result = await addInventoryTransaction({
       sku: formData.productSku,
       type: "Import",
@@ -226,7 +272,6 @@ export default function InboundPage() {
       supplierId: formData.supplierId,
       note: formData.note,
     });
-
     setIsSubmitting(false);
     if (result.ok) {
       toast("Nhập kho thành công.", "success");
@@ -340,13 +385,14 @@ export default function InboundPage() {
               background: "linear-gradient(135deg, #d97706, #f59e0b)",
               boxShadow: "0 4px 16px rgba(245,158,11,0.3)",
             }}
-            onClick={handleOpenModal}
+            onClick={() => handleOpenModal()}
           >
             <Plus size={15} />
             Tạo phiếu nhập kho
           </button>
         </div>
       </div>
+
       {/* ===== SEARCH ===== */}
       <div className="search-bar" style={{ marginBottom: 20, maxWidth: 400 }}>
         <Search size={15} className="search-icon" />
@@ -359,6 +405,7 @@ export default function InboundPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
       {/* ===== TABLE ===== */}
       <div
         className="animate-fade-up"
@@ -399,7 +446,11 @@ export default function InboundPage() {
                 filteredProducts.map((product) => {
                   const isLow = product.quantity < product.minQuantity;
                   return (
-                    <tr key={product._id}>
+                    <tr
+                      key={product._id}
+                      onClick={() => handleOpenHistory(product)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <td>
                         <span
                           style={{
@@ -509,6 +560,321 @@ export default function InboundPage() {
           </table>
         </div>
       </div>
+
+      {/* ===== MODAL LỊCH SỬ NHẬP KHO ===== */}
+      {isHistoryModalOpen && selectedProduct && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setIsHistoryModalOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "#11131e",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 520,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              overflow: "hidden",
+              animation: "scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background:
+                  "linear-gradient(to right, rgba(245,158,11,0.05), transparent)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: "rgba(245,158,11,0.15)",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Clock size={15} color="#f59e0b" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                    Lịch Sử Nhập Kho
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                    {selectedProduct.name} —{" "}
+                    <span style={{ color: "#f59e0b", fontFamily: "monospace" }}>
+                      {selectedProduct.sku}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#9ca3af",
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+                onClick={() => setIsHistoryModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body - danh sách log */}
+            <div
+              style={{
+                padding: 16,
+                maxHeight: 420,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {isLoadingHistory ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 48,
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      border: "3px solid rgba(245,158,11,0.2)",
+                      borderTopColor: "#f59e0b",
+                      borderRadius: "50%",
+                    }}
+                    className="spinner"
+                  />
+                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                    Đang tải lịch sử...
+                  </span>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 48,
+                    gap: 10,
+                  }}
+                >
+                  <ArrowDownRight
+                    size={36}
+                    style={{ opacity: 0.2, color: "#f59e0b" }}
+                  />
+                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                    Chưa có phiếu nhập kho nào cho sản phẩm này.
+                  </span>
+                </div>
+              ) : (
+                historyLogs.map((log, idx) => (
+                  <div
+                    key={log._id}
+                    style={{
+                      padding: "12px 14px",
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      animation: `fadeIn 0.2s ease ${idx * 30}ms both`,
+                    }}
+                  >
+                    {/* Icon */}
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        flexShrink: 0,
+                        background: "rgba(245,158,11,0.12)",
+                        border: "1px solid rgba(245,158,11,0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ArrowDownRight size={16} color="#f59e0b" />
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Mã chứng từ */}
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#6b7280",
+                          fontFamily: "monospace",
+                          marginBottom: 4,
+                        }}
+                      >
+                        #{log._id.slice(-8).toUpperCase()}
+                      </div>
+                      {/* Người thực hiện + nhà cung cấp */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            color: "#e5e7eb",
+                          }}
+                        >
+                          <User size={11} color="#9ca3af" />
+                          {log.executor.username}
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "#818cf8",
+                              fontWeight: 600,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {log.executor.role}
+                          </span>
+                        </span>
+                        <span style={{ color: "#374151" }}>·</span>
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            color: "#9ca3af",
+                          }}
+                        >
+                          <Building2 size={11} />
+                          {log.supplierName}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Số lượng + thời gian */}
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: "#f59e0b",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        +{log.quantity} cái
+                      </div>
+                      <div
+                        style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}
+                      >
+                        {new Date(log.createdAt).toLocaleString("vi-VN")}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "14px 24px",
+                borderTop: "1px solid rgba(255,255,255,0.05)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                backgroundColor: "rgba(0,0,0,0.15)",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                {historyLogs.length} phiếu nhập
+              </span>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setIsHistoryModalOpen(false)}
+                >
+                  Đóng lại
+                </button>
+                <button
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "linear-gradient(135deg, #d97706, #f59e0b)",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                  onClick={() => {
+                    setIsHistoryModalOpen(false);
+                    handleOpenModal(selectedProduct.sku);
+                  }}
+                >
+                  <ArrowDownToLine size={14} />
+                  Tạo phiếu nhập kho
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== MODAL CHÍNH: LẬP PHIẾU NHẬP KHO ===== */}
       {isModalOpen && (
         <div className="modal-overlay">
@@ -600,7 +966,7 @@ export default function InboundPage() {
                   )}
                 </div>
 
-                {/* CHỌN NHÀ CUNG CẤP & NÚT THÊM NHANH */}
+                {/* Nhà cung cấp */}
                 <div>
                   <label
                     className="form-label"
@@ -793,7 +1159,6 @@ export default function InboundPage() {
                   marginBottom: 24,
                 }}
               >
-                {/* Tên nhà cung cấp */}
                 <div>
                   <label
                     className="form-label"
@@ -823,8 +1188,6 @@ export default function InboundPage() {
                     required
                   />
                 </div>
-
-                {/* Người liên hệ */}
                 <div>
                   <label
                     className="form-label"
@@ -853,8 +1216,6 @@ export default function InboundPage() {
                     }}
                   />
                 </div>
-
-                {/* Email & Phone (Bố trí nằm ngang nếu màn hình đủ rộng) */}
                 <div style={{ display: "flex", gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <label
@@ -958,6 +1319,15 @@ export default function InboundPage() {
           </div>
         </div>
       )}
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        `,
+        }}
+      />
     </div>
   );
 }

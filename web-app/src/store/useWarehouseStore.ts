@@ -25,6 +25,7 @@ interface Transaction {
   type: "Import" | "Export";
   quantity: number;
   date: string;
+  supplierName: string; 
   executor: {
     username: string;
     role: string;
@@ -146,6 +147,7 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
           type: t.type,
           quantity: t.quantity || 0,
           date: new Date(t.createdAt).toLocaleString("vi-VN"),
+          supplierName: t.productId?.supplierId?.name || "Không xác định",
           executor: {
             username: t.userId?.username || "Ẩn danh",
             role: t.userId?.role || "User",

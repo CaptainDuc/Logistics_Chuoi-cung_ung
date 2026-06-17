@@ -15,7 +15,10 @@ import {
   ArrowUpToLine,
   AlertTriangle,
   CheckCircle,
+  Clock,
+  ArrowUpRight,
   User,
+  Users,
 } from "lucide-react";
 import { useWarehouseStore } from "@/store/useWarehouseStore";
 import { useToastStore } from "@/store/useToastStore";
@@ -25,121 +28,163 @@ import { useAdminStore } from "@/store/useAdminStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+interface Customer {
+  _id: string;
+  name: string;
+}
+
+interface Product {
+  _id: string;
+  sku: string;
+  name: string;
+  location?: string;
+  quantity: number;
+  minQuantity: number;
+}
+
+interface OutboundLog {
+  _id: string;
+  quantity: number;
+  createdAt: string;
+  customerName: string;
+  executor: {
+    username: string;
+    role: string;
+  };
+}
+
 export default function OutboundPage() {
   const { adminName } = useAdminStore();
   const { products, isLoading, fetchProducts, addInventoryTransaction } =
     useWarehouseStore();
-  const toast = useToastStore((s) => s.show);
 
-  // States
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [customers, setCustomers] = useState<{ _id: string; name: string }[]>(
-    [],
-  );
+
+  // State lịch sử xuất kho của sản phẩm
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState<OutboundLog[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Quản lý khách hàng
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isFastCustomerModalOpen, setIsFastCustomerModalOpen] = useState(false);
+  const [fastCustomerName, setFastCustomerName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+
   const [formData, setFormData] = useState({
     productSku: "",
     qty: 1,
     customerId: "",
+    note: "",
   });
 
-  // Fast Customer Modal States
-  const [isFastCustomerModalOpen, setIsFastCustomerModalOpen] = useState(false);
-  const [fastCustomerName, setFastCustomerName] = useState("");
-  const [contactName, setContactName] = useState(""); // Thêm trường này
-  const [phone, setPhone] = useState("");
-  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-
+  const toast = useToastStore((s) => s.show);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
+    if (fetchProducts) fetchProducts();
     fetchCustomers();
+  }, [fetchProducts]);
+
+  useEffect(() => {
     setIsAdmin(isAdminUser());
   }, []);
 
   const fetchCustomers = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/customers`, {
+      const response = await fetch(`${API_URL}/customers`, {
+        method: "GET",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.success) setCustomers(data.data);
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success) {
+          setCustomers(resData.data || []);
+        }
+      }
     } catch (err) {
-      console.error("Lỗi lấy danh sách khách hàng");
+      console.error("Lỗi lấy danh sách khách hàng:", err);
     }
   };
 
-  const handleOpenModal = () => {
-    // Tự động chọn sản phẩm đầu tiên nếu có để tránh trống trường
-    if (products && products.length > 0) {
-      setFormData({
-        productSku: products[0].sku,
-        qty: 1,
-        customerId: "",
-      });
-    } else {
-      setFormData({ productSku: "", qty: 1, customerId: "" });
+  // Fetch lịch sử xuất kho theo productId
+  const handleOpenHistory = async (product: Product) => {
+    setSelectedProduct(product);
+    setIsHistoryModalOpen(true);
+    setIsLoadingHistory(true);
+    setHistoryLogs([]);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/inventory/logs?productId=${product._id}&type=Export`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const resData = await response.json();
+      if (resData.success) {
+        const mapped = (resData.data || []).map((t: any) => ({
+          _id: t._id,
+          quantity: t.quantity,
+          createdAt: t.createdAt,
+          customerName:
+            t.customerName || t.productId?.customerId?.name || "Không xác định",
+          executor: {
+            username: t.userId?.username || "Ẩn danh",
+            role: t.userId?.role || "User",
+          },
+        }));
+        setHistoryLogs(mapped);
+      }
+    } catch (err) {
+      toast("Không thể tải lịch sử giao dịch.", "error");
+    } finally {
+      setIsLoadingHistory(false);
     }
-    setIsModalOpen(true);
   };
 
-  const handleCreateCustomer = async (e: React.FormEvent) => {
+  const handleCreateFastCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fastCustomerName.trim()) {
+      toast("Vui lòng nhập tên khách hàng.", "error");
+      return;
+    }
     setIsCreatingCustomer(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/customers`, {
+      const response = await fetch(`${API_URL}/customers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        // Gửi đầy đủ thông tin
         body: JSON.stringify({
-          name: fastCustomerName,
-          contactName: contactName,
-          phone: phone,
+          name: fastCustomerName.trim(),
+          contactName: contactName.trim(),
+          phone: phone.trim(),
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        toast("Đã thêm khách hàng mới", "success");
-        fetchCustomers();
-        setIsFastCustomerModalOpen(false);
-        // Reset form
-        setFastCustomerName("");
-        setContactName("");
-        setPhone("");
-      } else toast(data.message, "error");
+      const resData = await response.json();
+      if (!response.ok)
+        throw new Error(resData.message || "Tạo khách hàng nhanh thất bại.");
+      toast("Đã thêm nhanh khách hàng mới!", "success");
+      const newCustomer = resData.data;
+      setCustomers((prev) => [...prev, newCustomer]);
+      setFormData((prev) => ({ ...prev, customerId: newCustomer._id }));
+      setFastCustomerName("");
+      setContactName("");
+      setPhone("");
+      setIsFastCustomerModalOpen(false);
+    } catch (err: any) {
+      toast(err.message || "Không thể tạo nhanh khách hàng", "error");
     } finally {
       setIsCreatingCustomer(false);
     }
-  };
-
-  const handleSubmitTicket = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.customerId) {
-      toast("Vui lòng chọn khách hàng", "error");
-      return;
-    }
-
-    setIsSubmitting(true);
-    const result = await addInventoryTransaction({
-      sku: formData.productSku,
-      type: "Export",
-      quantity: formData.qty,
-      customerName:
-        customers.find((c) => c._id === formData.customerId)?.name || "",
-    });
-    setIsSubmitting(false);
-    if (result.ok) {
-      toast("Xuất kho thành công.", "success");
-      setIsModalOpen(false);
-    } else toast(result.message, "error");
   };
 
   const handleExportOutboundExcel = async () => {
@@ -148,6 +193,7 @@ export default function OutboundPage() {
       return;
     }
     setIsExporting(true);
+    let url = "";
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -165,14 +211,13 @@ export default function OutboundPage() {
         throw new Error(msg);
       }
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "bao-cao-xuat-kho.xlsx";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
       toast("Đã tải file Excel xuất kho.", "success");
     } catch (err) {
       toast(
@@ -180,11 +225,52 @@ export default function OutboundPage() {
         "error",
       );
     } finally {
+      if (url) window.URL.revokeObjectURL(url);
       setIsExporting(false);
     }
   };
 
-  const safeProducts = products || [];
+  const handleOpenModal = (sku?: string) => {
+    const safeProducts = products || [];
+    setFormData({
+      productSku:
+        sku || (safeProducts.length > 0 ? safeProducts[0].sku || "" : ""),
+      qty: 1,
+      customerId: "",
+      note: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.productSku) {
+      toast("Vui lòng chọn một sản phẩm để xuất kho.", "error");
+      return;
+    }
+    if (!formData.customerId) {
+      toast("Vui lòng lựa chọn hoặc tạo nhanh một khách hàng.", "error");
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await addInventoryTransaction({
+      sku: formData.productSku,
+      type: "Export",
+      quantity: formData.qty,
+      customerName:
+        customers.find((c) => c._id === formData.customerId)?.name || "",
+      note: formData.note,
+    });
+    setIsSubmitting(false);
+    if (result.ok) {
+      toast("Xuất kho thành công.", "success");
+      setIsModalOpen(false);
+    } else {
+      toast(result.message, "error");
+    }
+  };
+
+  const safeProducts: Product[] = products || [];
   const filteredProducts = safeProducts.filter(
     (product) =>
       (product.sku || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -282,7 +368,14 @@ export default function OutboundPage() {
               {isExporting ? "Đang xuất..." : "Xuất Excel"}
             </button>
           )}
-          <button className="btn btn-rose" onClick={handleOpenModal}>
+          <button
+            className="btn btn-primary"
+            style={{
+              background: "linear-gradient(135deg, #e11d48, #f43f5e)",
+              boxShadow: "0 4px 16px rgba(244,63,94,0.3)",
+            }}
+            onClick={() => handleOpenModal()}
+          >
             <Plus size={15} />
             Tạo phiếu xuất kho
           </button>
@@ -342,7 +435,11 @@ export default function OutboundPage() {
                 filteredProducts.map((product) => {
                   const isAtMin = product.quantity <= product.minQuantity;
                   return (
-                    <tr key={product._id}>
+                    <tr
+                      key={product._id}
+                      onClick={() => handleOpenHistory(product)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <td>
                         <span
                           style={{
@@ -453,27 +550,359 @@ export default function OutboundPage() {
         </div>
       </div>
 
-      {/* ===== MODAL XUẤT KHO ===== */}
-      {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-panel" style={{ maxWidth: 500 }}>
-            <div className="modal-header">
+      {/* ===== MODAL LỊCH SỬ XUẤT KHO ===== */}
+      {isHistoryModalOpen && selectedProduct && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setIsHistoryModalOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "#11131e",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 520,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              overflow: "hidden",
+              animation: "scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background:
+                  "linear-gradient(to right, rgba(244,63,94,0.05), transparent)",
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="modal-icon">
-                  <FileText size={16} />
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: "rgba(244,63,94,0.15)",
+                    border: "1px solid rgba(244,63,94,0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Clock size={15} color="#f43f5e" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                    Lịch Sử Xuất Kho
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                    {selectedProduct.name} —{" "}
+                    <span style={{ color: "#f43f5e", fontFamily: "monospace" }}>
+                      {selectedProduct.sku}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#9ca3af",
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+                onClick={() => setIsHistoryModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body - danh sách log */}
+            <div
+              style={{
+                padding: 16,
+                maxHeight: 420,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {isLoadingHistory ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 48,
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      border: "3px solid rgba(244,63,94,0.2)",
+                      borderTopColor: "#f43f5e",
+                      borderRadius: "50%",
+                    }}
+                    className="spinner"
+                  />
+                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                    Đang tải lịch sử...
+                  </span>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 48,
+                    gap: 10,
+                  }}
+                >
+                  <ArrowUpRight
+                    size={36}
+                    style={{ opacity: 0.2, color: "#f43f5e" }}
+                  />
+                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                    Chưa có phiếu xuất kho nào cho sản phẩm này.
+                  </span>
+                </div>
+              ) : (
+                historyLogs.map((log, idx) => (
+                  <div
+                    key={log._id}
+                    style={{
+                      padding: "12px 14px",
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      animation: `fadeIn 0.2s ease ${idx * 30}ms both`,
+                    }}
+                  >
+                    {/* Icon */}
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        flexShrink: 0,
+                        background: "rgba(244,63,94,0.12)",
+                        border: "1px solid rgba(244,63,94,0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ArrowUpRight size={16} color="#f43f5e" />
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Mã chứng từ */}
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#6b7280",
+                          fontFamily: "monospace",
+                          marginBottom: 4,
+                        }}
+                      >
+                        #{log._id.slice(-8).toUpperCase()}
+                      </div>
+                      {/* Người thực hiện + khách hàng */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            color: "#e5e7eb",
+                          }}
+                        >
+                          <User size={11} color="#9ca3af" />
+                          {log.executor.username}
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "#818cf8",
+                              fontWeight: 600,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {log.executor.role}
+                          </span>
+                        </span>
+                        <span style={{ color: "#374151" }}>·</span>
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            color: "#9ca3af",
+                          }}
+                        >
+                          <Users size={11} />
+                          {log.customerName}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Số lượng + thời gian */}
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: "#f43f5e",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        -{log.quantity} cái
+                      </div>
+                      <div
+                        style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}
+                      >
+                        {new Date(log.createdAt).toLocaleString("vi-VN")}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "14px 24px",
+                borderTop: "1px solid rgba(255,255,255,0.05)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                backgroundColor: "rgba(0,0,0,0.15)",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                {historyLogs.length} phiếu xuất
+              </span>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setIsHistoryModalOpen(false)}
+                >
+                  Đóng lại
+                </button>
+                <button
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "linear-gradient(135deg, #e11d48, #f43f5e)",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                  onClick={() => {
+                    setIsHistoryModalOpen(false);
+                    handleOpenModal(selectedProduct.sku);
+                  }}
+                >
+                  <ArrowUpToLine size={14} />
+                  Tạo phiếu xuất kho
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL CHÍNH: LẬP PHIẾU XUẤT KHO ===== */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-panel">
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background: "rgba(244,63,94,0.12)",
+                    border: "1px solid rgba(244,63,94,0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <FileText size={16} color="#f43f5e" />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: "var(--text-primary)",
+                    }}
+                  >
                     Lập Phiếu Xuất Kho
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    Giao hàng cho đối tác / đại lý
+                    Giao hàng cho khách hàng / đại lý
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="btn btn-ghost"
+                className="btn btn-icon btn-ghost"
+                style={{ width: 32, height: 32 }}
               >
                 <X size={15} />
               </button>
@@ -482,55 +911,70 @@ export default function OutboundPage() {
             <form onSubmit={handleSubmitTicket}>
               <div
                 className="modal-body"
-                style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                style={{ display: "flex", flexDirection: "column", gap: 18 }}
               >
-                {/* Product Select */}
+                {/* Product select */}
                 <div>
-                  <label className="form-label">SẢN PHẨM</label>
-                  <select
-                    className="form-input"
-                    value={formData.productSku}
-                    onChange={(e) =>
-                      setFormData({ ...formData, productSku: e.target.value })
-                    }
+                  <label className="form-label">
+                    <PackageMinus size={12} />
+                    Chọn vật tư / Sản phẩm xuất
+                  </label>
+                  {safeProducts.length > 0 ? (
+                    <select
+                      className="form-input"
+                      value={formData.productSku}
+                      onChange={(e) => {
+                        const selectedProd = safeProducts.find(
+                          (p) => p.sku === e.target.value,
+                        );
+                        setFormData({
+                          ...formData,
+                          productSku: selectedProd ? selectedProd.sku : "",
+                        });
+                      }}
+                    >
+                      {safeProducts.map((p) => (
+                        <option key={p._id} value={p.sku}>
+                          {p.name} ({p.sku}) — Tồn: {p.quantity ?? 0}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "12px 16px",
+                        background: "rgba(244,63,94,0.08)",
+                        border: "1px solid rgba(244,63,94,0.2)",
+                        borderRadius: 10,
+                        fontSize: 13,
+                        color: "#fb7185",
+                      }}
+                    >
+                      Chưa có sản phẩm nào. Hãy thêm sản phẩm trước.
+                    </div>
+                  )}
+                </div>
+
+                {/* Khách hàng */}
+                <div>
+                  <label
+                    className="form-label"
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
                   >
-                    {products.map((p) => (
-                      <option key={p._id} value={p.sku}>
-                        {p.name} ({p.sku})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Quantity Input */}
-                <div>
-                  <label className="form-label">SỐ LƯỢNG XUẤT</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={formData.qty}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        qty: parseInt(e.target.value) || 1,
-                      })
-                    }
-                    min="1"
-                  />
-                </div>
-
-                {/* Customer Select */}
-                <div>
-                  <label className="form-label">CHỌN KHÁCH HÀNG</label>
+                    <Users size={12} />
+                    Đối tác / Khách hàng
+                  </label>
                   <div style={{ display: "flex", gap: 8 }}>
                     <select
                       className="form-input"
+                      style={{ flex: 1 }}
                       value={formData.customerId}
+                      required
                       onChange={(e) =>
                         setFormData({ ...formData, customerId: e.target.value })
                       }
                     >
-                      <option value="">-- Chọn khách hàng --</option>
+                      <option value="">-- Chọn khách hàng nhận hàng --</option>
                       {customers.map((c) => (
                         <option key={c._id} value={c._id}>
                           {c.name}
@@ -539,32 +983,109 @@ export default function OutboundPage() {
                     </select>
                     <button
                       type="button"
-                      className="btn btn-ghost"
+                      className="btn"
                       onClick={() => setIsFastCustomerModalOpen(true)}
+                      style={{
+                        background: "rgba(99,102,241,0.1)",
+                        color: "#6366f1",
+                        border: "1px solid rgba(99,102,241,0.2)",
+                        whiteSpace: "nowrap",
+                        padding: "0 12px",
+                      }}
                     >
-                      <Plus size={16} />
+                      <Plus size={14} />
+                      Thêm nhanh
                     </button>
                   </div>
                 </div>
 
-                {/* Created By (Read-only) */}
+                {/* Quantity */}
                 <div>
-                  <label className="form-label">NGƯỜI TẠO PHIẾU</label>
+                  <label className="form-label">
+                    <ArrowUpToLine size={12} />
+                    Số lượng xuất kho
+                  </label>
                   <input
                     className="form-input"
-                    disabled
-                    value={adminName}
-                    style={{ opacity: 0.7, cursor: "not-allowed" }}
+                    type="number"
+                    min="1"
+                    required
+                    value={formData.qty}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        qty: parseInt(e.target.value, 10) || 1,
+                      })
+                    }
+                    style={{ fontFamily: "monospace", fontWeight: 600 }}
                   />
+                </div>
+
+                {/* Note */}
+                <div>
+                  <label className="form-label">Ghi chú (Tùy chọn)</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    placeholder="Nhập lý do xuất kho / giao hàng..."
+                    value={formData.note}
+                    onChange={(e) =>
+                      setFormData({ ...formData, note: e.target.value })
+                    }
+                    style={{ resize: "none" }}
+                  />
+                </div>
+
+                {/* Operator info */}
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 10,
+                    fontSize: 12.5,
+                    color: "var(--text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{ color: "var(--text-secondary)", fontWeight: 600 }}
+                  >
+                    Người thực hiện:
+                  </span>
+                  {adminName}
                 </div>
               </div>
 
               <div className="modal-footer">
                 <button
-                  type="submit"
-                  className="btn btn-rose"
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => !isSubmitting && setIsModalOpen(false)}
                   disabled={isSubmitting}
                 >
+                  <X size={14} />
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="btn"
+                  disabled={safeProducts.length === 0 || isSubmitting}
+                  style={{
+                    background: "linear-gradient(135deg, #e11d48, #f43f5e)",
+                    color: "#fff",
+                    boxShadow: "0 4px 16px rgba(244,63,94,0.3)",
+                    opacity:
+                      safeProducts.length === 0 || isSubmitting ? 0.5 : 1,
+                  }}
+                >
+                  {isSubmitting ? (
+                    <Loader2 size={14} className="spinner" />
+                  ) : (
+                    <Check size={14} />
+                  )}
                   {isSubmitting ? "Đang xử lý..." : "Xác nhận xuất kho"}
                 </button>
               </div>
@@ -573,75 +1094,199 @@ export default function OutboundPage() {
         </div>
       )}
 
-      {/* ===== MODAL THÊM KHÁCH HÀNG MỚI ===== */}
+      {/* ===== MODAL CON: THÊM NHANH KHÁCH HÀNG ===== */}
       {isFastCustomerModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-panel" style={{ maxWidth: 450 }}>
-            <div className="modal-header">
-              <h3>Thêm khách hàng mới</h3>
+        <div
+          className="modal-overlay"
+          style={{
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            className="modal-panel"
+            style={{
+              maxWidth: 500,
+              width: "100%",
+              background: "#1e2030",
+              borderRadius: 16,
+              padding: 24,
+              border: "1px solid #334155",
+            }}
+          >
+            <div
+              className="modal-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Users size={20} color="#818cf8" />
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
+                  Thêm Khách Hàng
+                </span>
+              </div>
               <button
                 onClick={() => setIsFastCustomerModalOpen(false)}
-                className="btn btn-ghost"
+                className="btn-ghost"
               >
-                <X size={15} />
+                <X size={20} color="#94a3b8" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCustomer}>
+            <form onSubmit={handleCreateFastCustomer}>
               <div
                 className="modal-body"
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                  marginBottom: 24,
+                }}
               >
                 <div>
-                  <label className="form-label">Tên Khách Hàng *</label>
+                  <label
+                    className="form-label"
+                    style={{
+                      display: "block",
+                      marginBottom: 8,
+                      color: "#e2e8f0",
+                      fontSize: 14,
+                    }}
+                  >
+                    TÊN KHÁCH HÀNG *
+                  </label>
                   <input
+                    type="text"
                     className="form-input"
                     placeholder="Ví dụ: Công ty TNHH A..."
                     value={fastCustomerName}
                     onChange={(e) => setFastCustomerName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "1px solid #475569",
+                      padding: "10px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="form-label">Người liên hệ</label>
+                  <label
+                    className="form-label"
+                    style={{
+                      display: "block",
+                      marginBottom: 8,
+                      color: "#e2e8f0",
+                      fontSize: 14,
+                    }}
+                  >
+                    NGƯỜI LIÊN HỆ
+                  </label>
                   <input
+                    type="text"
                     className="form-input"
                     placeholder="Ví dụ: Nguyễn Văn A"
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "1px solid #475569",
+                      padding: "10px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="form-label">Số điện thoại</label>
+                  <label
+                    className="form-label"
+                    style={{
+                      display: "block",
+                      marginBottom: 8,
+                      color: "#e2e8f0",
+                      fontSize: 14,
+                    }}
+                  >
+                    SỐ ĐIỆN THOẠI
+                  </label>
                   <input
+                    type="tel"
                     className="form-input"
                     placeholder="090..."
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "1px solid #475569",
+                      padding: "10px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="modal-footer">
+              <div
+                className="modal-footer"
+                style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}
+              >
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn"
                   onClick={() => setIsFastCustomerModalOpen(false)}
+                  style={{
+                    padding: "10px 24px",
+                    background: "#334155",
+                    color: "#fff",
+                    borderRadius: 8,
+                  }}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-rose"
+                  className="btn"
                   disabled={isCreatingCustomer}
+                  style={{
+                    padding: "10px 24px",
+                    background: "#6366f1",
+                    color: "#fff",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
                 >
-                  {isCreatingCustomer ? "Đang lưu..." : "Lưu lại"}
+                  {isCreatingCustomer ? (
+                    <Loader2 size={16} className="spinner" />
+                  ) : (
+                    <Check size={16} />
+                  )}
+                  Lưu lại
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        `,
+        }}
+      />
     </div>
   );
 }
